@@ -35,7 +35,7 @@ export function createCalendarReadyMessage(url: string): LineMessage {
       actions: [
         {
           type: "uri",
-          label: "เพิ่มเข้า Apple Calendar",
+          label: "เพิ่มใน Calendar",
           uri: url,
         },
       ],

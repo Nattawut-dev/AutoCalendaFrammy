@@ -23,6 +23,12 @@ export class LineContentDownloadError extends AppError {
     super("Unable to download LINE content", "LINE_CONTENT_DOWNLOAD_FAILED");
   }
 }
+export class LineMessageSendError extends AppError {
+  constructor(readonly status: number) {
+    super("LINE message request failed", "LINE_MESSAGE_SEND_FAILED");
+    this.name = "LineMessageSendError";
+  }
+}
 export class UnsupportedImageError extends AppError {
   constructor(message = "Unsupported image") {
     super(message, "UNSUPPORTED_IMAGE");

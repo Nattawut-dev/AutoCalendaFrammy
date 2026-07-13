@@ -2,7 +2,12 @@ import "server-only";
 
 import { MAX_IMAGE_BYTES } from "@/lib/constants";
 import { getEnv } from "@/lib/env";
-import { LineContentDownloadError, UnsupportedImageError } from "@/lib/errors";
+import {
+  LineContentDownloadError,
+  LineMessageSendError,
+  UnsupportedImageError,
+} from "@/lib/errors";
+import { cleanText, truncate } from "@/lib/utils/text";
 
 export type LineMessage = Record<string, unknown>;
 
@@ -109,15 +114,52 @@ async function sendLineMessages(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
+    let lineError:
+      | {
+          message?: string;
+          details?: Array<{ message?: string; property?: string }>;
+        }
+      | undefined;
+    try {
+      const value: unknown = await response.json();
+      if (typeof value === "object" && value !== null) {
+        const record = value as Record<string, unknown>;
+        const details = Array.isArray(record.details)
+          ? record.details.flatMap((detail) => {
+              if (typeof detail !== "object" || detail === null) return [];
+              const item = detail as Record<string, unknown>;
+              return [
+                {
+                  ...(typeof item.message === "string"
+                    ? { message: truncate(cleanText(item.message), 160) }
+                    : {}),
+                  ...(typeof item.property === "string"
+                    ? { property: truncate(cleanText(item.property), 160) }
+                    : {}),
+                },
+              ];
+            })
+          : undefined;
+        lineError = {
+          ...(typeof record.message === "string"
+            ? { message: truncate(cleanText(record.message), 160) }
+            : {}),
+          ...(details?.length ? { details: details.slice(0, 5) } : {}),
+        };
+      }
+    } catch {
+      // LINE occasionally returns an empty/non-JSON error response.
+    }
     console.error(
       JSON.stringify({
         level: "error",
         operation: "line_message_send",
         path,
         status: response.status,
+        ...(lineError ? { lineError } : {}),
       }),
     );
-    throw new Error("LINE message request failed");
+    throw new LineMessageSendError(response.status);
   }
 }
 

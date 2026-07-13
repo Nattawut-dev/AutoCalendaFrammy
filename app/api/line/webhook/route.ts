@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { createCalendarDownloadUrl } from "@/lib/calendar/download-url";
 import { getEnv } from "@/lib/env";
-import { AppError, GeminiAnalysisError } from "@/lib/errors";
+import {
+  AppError,
+  GeminiAnalysisError,
+  LineMessageSendError,
+} from "@/lib/errors";
 import { analyzeRosterImage } from "@/lib/gemini/analyze-roster";
 import {
   downloadLineMessageContent,
@@ -244,6 +248,7 @@ export async function POST(request: Request): Promise<Response> {
             error instanceof AppError ? error.code : "UNEXPECTED_ERROR",
         }),
       );
+      if (error instanceof LineMessageSendError) continue;
       try {
         await safeReply(event.replyToken, [
           error instanceof GeminiAnalysisError

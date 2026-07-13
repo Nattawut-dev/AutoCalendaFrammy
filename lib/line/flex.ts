@@ -125,5 +125,5 @@ export function createPreviewMessages(job: StoredRosterJob): LineMessage[] {
     detailMessages.push(...splitDetails(specialLines, "กิจกรรมจาก REMARK"));
   if (warningLines.length)
     detailMessages.push(...splitDetails(warningLines, "คำเตือน"));
-  return [createPreviewFlexMessage(job), ...detailMessages].slice(0, 5);
+  return [...detailMessages.slice(0, 4), createPreviewFlexMessage(job)];
 }
