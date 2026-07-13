@@ -13,5 +13,6 @@ export function createCalendarDownloadUrl(
     appBaseUrl,
   );
   url.searchParams.set("token", token);
+  url.searchParams.set("openExternalBrowser", "1");
   return url.toString();
 }

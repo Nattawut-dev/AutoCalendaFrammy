@@ -25,5 +25,6 @@ describe("calendar download URL", () => {
 
     expect(url.pathname).toBe(`/api/calendar/${job.id}/NANCHAYA-2026-07.ics`);
     expect(url.searchParams.get("token")).toBe("signed.token");
+    expect(url.searchParams.get("openExternalBrowser")).toBe("1");
   });
 });
