@@ -51,10 +51,6 @@ export function createUnauthorizedMessage(): LineMessage {
   return textMessage("บัญชี LINE นี้ไม่ได้รับอนุญาตให้ใช้งานบอต");
 }
 
-export function createRateLimitMessage(): LineMessage {
-  return textMessage("ใช้งานครบจำนวนที่กำหนดชั่วคราว กรุณาลองใหม่ภายหลัง");
-}
-
 export function createGenericAnalysisErrorMessage(): LineMessage {
   return textMessage(
     "ไม่สามารถอ่านรูปนี้ได้ กรุณาส่งภาพที่ชัดขึ้นและให้เห็นแถว NANCHAYA, หัววันที่, DETAILS และ REMARK ครบถ้วน",

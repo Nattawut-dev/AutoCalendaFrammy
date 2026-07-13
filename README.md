@@ -2,13 +2,13 @@
 
 บอต LINE ส่วนตัวสำหรับอ่านภาพตารางเวรด้วย Google Gemini โดยเลือกเฉพาะแถว `NANCHAYA` แสดงตัวอย่างให้ตรวจสอบ แล้วสร้างไฟล์ `.ics` สำหรับนำเข้า Apple Calendar บน iPhone
 
-ระบบออกแบบสำหรับ Next.js App Router และ Vercel Functions: ไม่เก็บไฟล์ภาพลงดิสก์, เก็บงานชั่วคราวใน Upstash Redis 30 นาที, จำกัดผู้ใช้ด้วย LINE user ID, จำกัดการวิเคราะห์ 5 ภาพต่อผู้ใช้ต่อชั่วโมง และใช้ลิงก์ดาวน์โหลดที่ลงลายเซ็น HMAC อายุ 15 นาที
+ระบบออกแบบสำหรับ Next.js App Router และ Vercel Functions: ไม่เก็บไฟล์ภาพลงดิสก์, เก็บงานชั่วคราวใน Upstash Redis 30 นาที, จำกัดผู้ใช้ด้วย LINE user ID และใช้ลิงก์ดาวน์โหลดที่ลงลายเซ็น HMAC อายุ 15 นาที
 
 ## สถาปัตยกรรม
 
 1. LINE ส่ง webhook มาที่ `POST /api/line/webhook`
 2. เซิร์ฟเวอร์ตรวจ `x-line-signature` กับ raw request body ก่อน parse JSON
-3. ตรวจ allowlist, idempotency และ rate limit ใน Redis
+3. ตรวจ allowlist และ idempotency ใน Redis
 4. ดาวน์โหลด JPEG/PNG จาก LINE (ไม่เกิน 10 MB) และตรวจ magic bytes
 5. ส่ง bytes ให้ Gemini ผ่าน `@google/genai` พร้อม JSON Schema
 6. normalize และ validate ข้อมูลครบทุกวันของเดือน รวม confidence และ warnings
@@ -65,7 +65,7 @@ Gemini free tier มีข้อจำกัดจำนวน request/token ซ
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 
-บอตใช้ Redis สำหรับงานชั่วคราว, webhook idempotency และ rate limit เท่านั้น ไม่ต้องใช้ local filesystem หรือฐานข้อมูลแบบเสียเงิน
+บอตใช้ Redis สำหรับงานชั่วคราวและ webhook idempotency เท่านั้น ไม่ต้องใช้ local filesystem หรือฐานข้อมูลแบบเสียเงิน
 
 ## E. สร้าง secret สำหรับลิงก์ดาวน์โหลด
 

@@ -15,7 +15,6 @@ import {
   createGeminiErrorMessage,
   createGenericAnalysisErrorMessage,
   createHelpMessage,
-  createRateLimitMessage,
   createReviewRequiredMessage,
   createUnauthorizedMessage,
   textMessage,
@@ -28,7 +27,6 @@ import {
 } from "@/lib/security/download-token";
 import {
   claimWebhookEvent,
-  consumeImageRateLimit,
   createRosterJob,
   deleteRosterJob,
   getRosterJob,
@@ -80,10 +78,6 @@ async function handleImage(event: WebhookEvent, userId: string): Promise<void> {
     .passthrough()
     .parse(event.message);
   const userBinding = hashLineUserId(userId);
-  if (!(await consumeImageRateLimit(userBinding))) {
-    await safeReply(event.replyToken, [createRateLimitMessage()]);
-    return;
-  }
 
   const { bytes, mimeType } = await downloadLineMessageContent(message.id);
   const roster = await analyzeRosterImage(bytes, mimeType);

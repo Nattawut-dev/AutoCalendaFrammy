@@ -1,11 +1,7 @@
 import "server-only";
 
 import { createHmac, randomUUID } from "node:crypto";
-import {
-  IMAGE_RATE_LIMIT,
-  IMAGE_RATE_WINDOW_SECONDS,
-  JOB_TTL_SECONDS,
-} from "@/lib/constants";
+import { JOB_TTL_SECONDS } from "@/lib/constants";
 import { getEnv } from "@/lib/env";
 import { storedRosterJobSchema } from "@/lib/schemas";
 import { getRedis } from "@/lib/storage/redis";
@@ -17,8 +13,6 @@ import type {
 
 export const jobKey = (jobId: string) => `roster-job:${jobId}`;
 export const eventKey = (eventId: string) => `line-event:${eventId}`;
-export const rateLimitKey = (userBinding: string, hourBucket: number) =>
-  `line-rate:${userBinding}:${hourBucket}`;
 
 export function serializeJob(job: StoredRosterJob): string {
   return JSON.stringify(job);
@@ -90,15 +84,4 @@ export async function claimWebhookEvent(
     ex: JOB_TTL_SECONDS,
   });
   return result === "OK";
-}
-
-export async function consumeImageRateLimit(
-  userBinding: string,
-  now = Date.now(),
-): Promise<boolean> {
-  const hourBucket = Math.floor(now / (IMAGE_RATE_WINDOW_SECONDS * 1000));
-  const key = rateLimitKey(userBinding, hourBucket);
-  const count = await getRedis().incr(key);
-  if (count === 1) await getRedis().expire(key, IMAGE_RATE_WINDOW_SECONDS + 60);
-  return count <= IMAGE_RATE_LIMIT;
 }

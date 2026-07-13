@@ -4,7 +4,6 @@ import {
   deserializeJob,
   eventKey,
   jobKey,
-  rateLimitKey,
   serializeJob,
 } from "@/lib/storage/jobs";
 import { sampleRoster } from "@/tests/fixtures/sample-roster";
@@ -13,7 +12,6 @@ describe("storage helpers", () => {
   it("creates namespaced keys", () => {
     expect(jobKey("abc")).toBe("roster-job:abc");
     expect(eventKey("event-1")).toBe("line-event:event-1");
-    expect(rateLimitKey("user-hash", 10)).toBe("line-rate:user-hash:10");
   });
 
   it("serializes and validates jobs without Redis", () => {
