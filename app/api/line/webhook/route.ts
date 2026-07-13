@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { createCalendarDownloadUrl } from "@/lib/calendar/download-url";
 import { getEnv } from "@/lib/env";
 import { AppError, GeminiAnalysisError } from "@/lib/errors";
 import { analyzeRosterImage } from "@/lib/gemini/analyze-roster";
@@ -121,6 +122,14 @@ async function handlePostback(
   const jobIdResult = z.uuid().safeParse(params.get("job"));
   if (!jobIdResult.success || (action !== "confirm" && action !== "cancel"))
     return;
+  console.info(
+    JSON.stringify({
+      level: "info",
+      operation: "line_postback",
+      action,
+      result: "received",
+    }),
+  );
   const job = await getRosterJob(jobIdResult.data);
   const userBinding = hashLineUserId(userId);
   if (
@@ -158,7 +167,7 @@ async function handlePostback(
     createUserBinding(userId, env.DOWNLOAD_TOKEN_SECRET),
     env.DOWNLOAD_TOKEN_SECRET,
   );
-  const url = `${env.APP_BASE_URL}/api/calendar/${confirmed.id}?token=${encodeURIComponent(token)}`;
+  const url = createCalendarDownloadUrl(env.APP_BASE_URL, confirmed, token);
   await safeReply(event.replyToken, [
     createCalendarReadyMessage(url),
     createCalendarUrlFallback(url),

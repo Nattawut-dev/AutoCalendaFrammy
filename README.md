@@ -13,7 +13,7 @@
 5. ส่ง bytes ให้ Gemini ผ่าน `@google/genai` พร้อม JSON Schema
 6. normalize และ validate ข้อมูลครบทุกวันของเดือน รวม confidence และ warnings
 7. เก็บงานชั่วคราวใน Redis และตอบ LINE ด้วย preview ภาษาไทย
-8. เมื่อกดยืนยัน ระบบออก signed URL และสร้าง ICS แบบ dynamic ที่ `GET /api/calendar/[jobId]`
+8. เมื่อกดยืนยัน ระบบออก signed URL และสร้าง ICS แบบ dynamic ที่ `GET /api/calendar/[jobId]/NANCHAYA-YYYY-MM.ics` โดย route เดิม `GET /api/calendar/[jobId]` ยังรองรับลิงก์ที่ออกไว้ก่อนหน้า
 
 กิจกรรมจาก REMARK เช่น Training จะเป็น VEVENT แยกจากกะทำงานและสามารถซ้อนเวลาได้ กะทำงานจะไม่ถูกลด ตัด หรือรวมกับกิจกรรม
 

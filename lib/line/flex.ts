@@ -71,6 +71,7 @@ export function createPreviewFlexMessage(job: StoredRosterJob): LineMessage {
               type: "postback",
               label: "ยืนยันสร้าง Calendar",
               data: `action=confirm&job=${job.id}`,
+              displayText: "ยืนยันสร้าง Calendar",
             },
           },
           {
@@ -80,6 +81,7 @@ export function createPreviewFlexMessage(job: StoredRosterJob): LineMessage {
               type: "postback",
               label: "ยกเลิก",
               data: `action=cancel&job=${job.id}`,
+              displayText: "ยกเลิกการสร้าง Calendar",
             },
           },
         ],
