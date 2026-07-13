@@ -1,4 +1,5 @@
 import type { LineMessage } from "@/lib/line/client";
+import type { GeminiFailureReason } from "@/lib/errors";
 import type { ValidationIssue } from "@/lib/types";
 import { truncate } from "@/lib/utils/text";
 
@@ -58,4 +59,30 @@ export function createGenericAnalysisErrorMessage(): LineMessage {
   return textMessage(
     "ไม่สามารถอ่านรูปนี้ได้ กรุณาส่งภาพที่ชัดขึ้นและให้เห็นแถว NANCHAYA, หัววันที่, DETAILS และ REMARK ครบถ้วน",
   );
+}
+
+export function createGeminiErrorMessage(
+  reason: GeminiFailureReason,
+): LineMessage {
+  if (reason === "rate_limited") {
+    return textMessage(
+      "โควตาการวิเคราะห์รูปเต็มชั่วคราว กรุณารอสักครู่แล้วลองส่งรูปใหม่อีกครั้ง",
+    );
+  }
+  if (reason === "authentication" || reason === "model_not_found") {
+    return textMessage(
+      "ระบบวิเคราะห์รูปยังตั้งค่าไม่สมบูรณ์ กรุณาตรวจสอบ GEMINI_API_KEY และ GEMINI_MODEL ใน Vercel",
+    );
+  }
+  if (reason === "service_unavailable") {
+    return textMessage(
+      "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่ภายหลัง",
+    );
+  }
+  if (reason === "invalid_request") {
+    return textMessage(
+      "Gemini ไม่รับคำขอวิเคราะห์นี้ กรุณาตรวจชื่อโมเดล แล้วลองส่งภาพ JPEG หรือ PNG ที่มีขนาดเล็กลง",
+    );
+  }
+  return createGenericAnalysisErrorMessage();
 }

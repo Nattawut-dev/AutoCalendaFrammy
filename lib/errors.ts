@@ -29,10 +29,23 @@ export class UnsupportedImageError extends AppError {
   }
 }
 export class GeminiAnalysisError extends AppError {
-  constructor() {
+  constructor(
+    readonly reason: GeminiFailureReason = "unknown",
+    readonly status?: number,
+  ) {
     super("Gemini analysis failed", "GEMINI_ANALYSIS_FAILED");
+    this.name = "GeminiAnalysisError";
   }
 }
+
+export type GeminiFailureReason =
+  | "authentication"
+  | "invalid_request"
+  | "invalid_response"
+  | "model_not_found"
+  | "rate_limited"
+  | "service_unavailable"
+  | "unknown";
 export class RosterValidationError extends AppError {
   constructor(readonly issues: string[]) {
     super("Roster validation failed", "ROSTER_VALIDATION_FAILED");

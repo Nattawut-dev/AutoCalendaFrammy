@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getEnv } from "@/lib/env";
+import { AppError, GeminiAnalysisError } from "@/lib/errors";
 import { analyzeRosterImage } from "@/lib/gemini/analyze-roster";
 import {
   downloadLineMessageContent,
@@ -11,6 +12,7 @@ import { createPreviewMessages } from "@/lib/line/flex";
 import {
   createCalendarReadyMessage,
   createCalendarUrlFallback,
+  createGeminiErrorMessage,
   createGenericAnalysisErrorMessage,
   createHelpMessage,
   createRateLimitMessage,
@@ -235,12 +237,15 @@ export async function POST(request: Request): Promise<Response> {
           operation: "line_event_processing",
           eventType: event.type,
           eventId: event.webhookEventId ?? "unknown",
-          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorCode:
+            error instanceof AppError ? error.code : "UNEXPECTED_ERROR",
         }),
       );
       try {
         await safeReply(event.replyToken, [
-          createGenericAnalysisErrorMessage(),
+          error instanceof GeminiAnalysisError
+            ? createGeminiErrorMessage(error.reason)
+            : createGenericAnalysisErrorMessage(),
         ]);
       } catch {
         // Reply tokens are single-use; a failed reply is logged by the LINE client.
