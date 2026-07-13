@@ -54,9 +54,10 @@ export async function analyzeRosterImage(
   image: Uint8Array,
   mimeType: "image/jpeg" | "image/png",
 ): Promise<RosterAnalysis> {
+  const model = getEnv().GEMINI_MODEL;
   try {
     const response = await getGeminiClient().models.generateContent({
-      model: getEnv().GEMINI_MODEL,
+      model,
       contents: [
         {
           role: "user",
@@ -86,6 +87,7 @@ export async function analyzeRosterImage(
         level: "error",
         operation: "gemini_roster_analysis",
         category: failure.reason,
+        model,
         ...(failure.status === undefined ? {} : { status: failure.status }),
       }),
     );

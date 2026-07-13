@@ -167,6 +167,18 @@ API routes ใช้ Node.js runtime และ webhook ตั้ง maximum dura
 
 ส่งภาพที่คมชัดขึ้น crop ให้ยังเห็น title, date headers, NANCHAYA, DETAILS และ REMARK ครบ ตรวจว่า model ใน `GEMINI_MODEL` รองรับ image input และ structured JSON output
 
+### Gemini ตอบ `model_not_found` หรือ 404
+
+ตั้ง `GEMINI_MODEL=gemini-2.5-flash-lite` ใน Vercel โดยไม่ใส่ quote, `models/` หรือข้อความ `GEMINI_MODEL=` ซ้ำในช่อง Value แล้ว redeploy ให้ environment ตรงกับ Production หากยังได้ 404 ให้ตรวจว่า API key มองเห็นโมเดลนี้:
+
+```bash
+curl --fail --silent \
+  -H "x-goog-api-key: $GEMINI_API_KEY" \
+  https://generativelanguage.googleapis.com/v1beta/models
+```
+
+ค้นหา `models/gemini-2.5-flash-lite` ในผลลัพธ์ หากไม่มี ให้สร้าง API key ใหม่จาก Google AI Studio project ที่เปิด Gemini API หรือกำหนด `GEMINI_MODEL` เป็น stable multimodal model ที่ปรากฏในผลลัพธ์และรองรับ structured output
+
 ### ภาพเบลอหรือข้อมูลบางวันหาย
 
 บอตจะสร้างสถานะ `needs_review` และไม่มีปุ่มยืนยัน ให้ส่งภาพใหม่ที่ความละเอียดสูงขึ้น หลีกเลี่ยงแสงสะท้อน และอย่าตัดขอบวันที่หรือ legend

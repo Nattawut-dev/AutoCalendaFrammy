@@ -1,13 +1,21 @@
 import "server-only";
 
 import { z } from "zod";
+import {
+  DEFAULT_GEMINI_MODEL,
+  normalizeGeminiModelName,
+} from "@/lib/gemini/model";
 
 const serverEnvSchema = z
   .object({
     LINE_CHANNEL_SECRET: z.string().min(1),
     LINE_CHANNEL_ACCESS_TOKEN: z.string().min(1),
     GEMINI_API_KEY: z.string().min(1),
-    GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash-lite"),
+    GEMINI_MODEL: z
+      .string()
+      .default(DEFAULT_GEMINI_MODEL)
+      .transform(normalizeGeminiModelName)
+      .pipe(z.string().min(1)),
     UPSTASH_REDIS_REST_URL: z.url(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
     DOWNLOAD_TOKEN_SECRET: z.string().min(32),
