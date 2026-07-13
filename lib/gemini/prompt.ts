@@ -1,3 +1,7 @@
+import "server-only";
+
+import { Type, type Schema } from "@google/genai";
+
 export const ROSTER_ANALYSIS_PROMPT = `
 Analyze this employee roster image by inspecting its visual table structure, not only OCR text.
 
@@ -21,8 +25,7 @@ Mandatory rules:
 `;
 
 export const ROSTER_RESPONSE_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
+  type: Type.OBJECT,
   required: [
     "employee",
     "month",
@@ -32,18 +35,28 @@ export const ROSTER_RESPONSE_SCHEMA = {
     "specialEvents",
     "warnings",
   ],
+  propertyOrdering: [
+    "employee",
+    "month",
+    "year",
+    "timezone",
+    "shifts",
+    "specialEvents",
+    "warnings",
+  ],
   properties: {
-    employee: { type: "string", enum: ["NANCHAYA"] },
-    month: { type: "integer", minimum: 1, maximum: 12 },
-    year: { type: "integer", minimum: 2020, maximum: 2100 },
-    timezone: { type: "string", enum: ["Asia/Bangkok"] },
+    employee: { type: Type.STRING, format: "enum", enum: ["NANCHAYA"] },
+    month: { type: Type.INTEGER },
+    year: { type: Type.INTEGER },
+    timezone: {
+      type: Type.STRING,
+      format: "enum",
+      enum: ["Asia/Bangkok"],
+    },
     shifts: {
-      type: "array",
-      minItems: 1,
-      maxItems: 31,
+      type: Type.ARRAY,
       items: {
-        type: "object",
-        additionalProperties: false,
+        type: Type.OBJECT,
         required: [
           "date",
           "code",
@@ -55,22 +68,25 @@ export const ROSTER_RESPONSE_SCHEMA = {
           "rawCellText",
         ],
         properties: {
-          date: { type: "string" },
-          code: { type: "string" },
-          start: { anyOf: [{ type: "string" }, { type: "null" }] },
-          end: { anyOf: [{ type: "string" }, { type: "null" }] },
-          isDayOff: { type: "boolean" },
-          source: { type: "string", enum: ["roster"] },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
-          rawCellText: { anyOf: [{ type: "string" }, { type: "null" }] },
+          date: { type: Type.STRING },
+          code: { type: Type.STRING },
+          start: { type: Type.STRING, nullable: true },
+          end: { type: Type.STRING, nullable: true },
+          isDayOff: { type: Type.BOOLEAN },
+          source: {
+            type: Type.STRING,
+            format: "enum",
+            enum: ["roster"],
+          },
+          confidence: { type: Type.NUMBER },
+          rawCellText: { type: Type.STRING, nullable: true },
         },
       },
     },
     specialEvents: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
-        additionalProperties: false,
+        type: Type.OBJECT,
         required: [
           "date",
           "title",
@@ -81,28 +97,31 @@ export const ROSTER_RESPONSE_SCHEMA = {
           "rawRemarkText",
         ],
         properties: {
-          date: { type: "string" },
-          title: { type: "string" },
-          start: { type: "string" },
-          end: { type: "string" },
-          source: { type: "string", enum: ["remark"] },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
-          rawRemarkText: { type: "string" },
+          date: { type: Type.STRING },
+          title: { type: Type.STRING },
+          start: { type: Type.STRING },
+          end: { type: Type.STRING },
+          source: {
+            type: Type.STRING,
+            format: "enum",
+            enum: ["remark"],
+          },
+          confidence: { type: Type.NUMBER },
+          rawRemarkText: { type: Type.STRING },
         },
       },
     },
     warnings: {
-      type: "array",
+      type: Type.ARRAY,
       items: {
-        type: "object",
-        additionalProperties: false,
+        type: Type.OBJECT,
         required: ["code", "message", "date"],
         properties: {
-          code: { type: "string" },
-          message: { type: "string" },
-          date: { anyOf: [{ type: "string" }, { type: "null" }] },
+          code: { type: Type.STRING },
+          message: { type: Type.STRING },
+          date: { type: Type.STRING, nullable: true },
         },
       },
     },
   },
-} as const;
+} satisfies Schema;

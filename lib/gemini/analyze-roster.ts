@@ -75,7 +75,7 @@ export async function analyzeRosterImage(
       config: {
         temperature: 0,
         responseMimeType: "application/json",
-        responseJsonSchema: ROSTER_RESPONSE_SCHEMA,
+        responseSchema: ROSTER_RESPONSE_SCHEMA,
       },
     });
     if (!response.text) throw new Error("empty model response");
@@ -88,6 +88,8 @@ export async function analyzeRosterImage(
         operation: "gemini_roster_analysis",
         category: failure.reason,
         model,
+        mimeType,
+        imageBytes: image.byteLength,
         ...(failure.status === undefined ? {} : { status: failure.status }),
       }),
     );
