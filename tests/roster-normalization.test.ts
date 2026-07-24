@@ -6,18 +6,25 @@ describe("roster normalization", () => {
   it("keeps legacy roster data compatible by defaulting missing colors", () => {
     const roster = cloneSampleRoster();
     const legacy = structuredClone(roster) as unknown as {
+      printedOffCount?: number | null;
       shifts: Array<Record<string, unknown>>;
     };
+    delete legacy.printedOffCount;
     for (const shift of legacy.shifts) {
+      delete shift.printedWeekday;
       delete shift.status;
       delete shift.statusConfidence;
     }
 
     const normalized = normalizeRoster(legacy);
+    expect(normalized.printedOffCount).toBeNull();
     expect(
       normalized.shifts.every(
         (shift) => shift.status === "NORMAL" && shift.statusConfidence === 1,
       ),
+    ).toBe(true);
+    expect(
+      normalized.shifts.every((shift) => shift.printedWeekday === null),
     ).toBe(true);
   });
 

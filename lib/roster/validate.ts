@@ -4,7 +4,12 @@ import {
   MIN_SPECIAL_EVENT_CONFIDENCE,
 } from "@/lib/constants";
 import type { RosterAnalysis, ValidationIssue } from "@/lib/types";
-import { daysInMonth, isValidIsoDate, isValidTime } from "@/lib/utils/date";
+import {
+  daysInMonth,
+  isValidIsoDate,
+  isValidTime,
+  weekdayForIsoDate,
+} from "@/lib/utils/date";
 
 const UNREADABLE_WARNING =
   /(unreadable|blurry|cropped|illegible|อ่านไม่ออก|ไม่ชัด)/i;
@@ -33,6 +38,19 @@ export function validateRoster(roster: RosterAnalysis): RosterValidationResult {
   }
 
   const dates = new Set<string>();
+  const actualOffCount = roster.shifts.filter((shift) => shift.isDayOff).length;
+  if (roster.printedOffCount === null) {
+    issues.push({
+      code: "missing_printed_off_count",
+      message: "อ่านยอด OFF ท้ายแถว NANCHAYA ไม่ได้",
+    });
+  } else if (actualOffCount !== roster.printedOffCount) {
+    issues.push({
+      code: "off_count_mismatch",
+      message: `จำนวน OFF ที่อ่านได้ ${actualOffCount} วัน ไม่ตรงกับยอด OFF ${roster.printedOffCount} ที่พิมพ์ในตาราง`,
+    });
+  }
+
   for (const shift of roster.shifts) {
     if (dates.has(shift.date)) {
       issues.push({
@@ -55,6 +73,20 @@ export function validateRoster(roster: RosterAnalysis): RosterValidationResult {
       issues.push({
         code: "wrong_month",
         message: "วันที่ไม่ตรงกับเดือนของตารางเวร",
+        date: shift.date,
+      });
+    }
+    const expectedWeekday = weekdayForIsoDate(shift.date);
+    if (shift.printedWeekday === null) {
+      issues.push({
+        code: "missing_printed_weekday",
+        message: "อ่านหัววันในสัปดาห์ไม่ได้",
+        date: shift.date,
+      });
+    } else if (shift.printedWeekday !== expectedWeekday) {
+      issues.push({
+        code: "weekday_mismatch",
+        message: `หัวตารางพิมพ์ ${shift.printedWeekday} แต่วันที่นี้ต้องเป็น ${expectedWeekday}`,
         date: shift.date,
       });
     }
@@ -143,10 +175,23 @@ export function validateRoster(roster: RosterAnalysis): RosterValidationResult {
         date: event.date,
       });
     }
+    if (!/\bNANCHAYA\b/i.test(event.rawRemarkText)) {
+      issues.push({
+        code: "special_missing_employee",
+        message: "ข้อความ REMARK ต้นทางไม่ได้ระบุ NANCHAYA",
+        date: event.date,
+      });
+    }
   }
 
   for (const warning of roster.warnings) {
-    if (UNREADABLE_WARNING.test(`${warning.code} ${warning.message}`)) {
+    if (warning.code.startsWith("independent_")) {
+      issues.push({
+        code: warning.code,
+        message: warning.message,
+        ...(warning.date ? { date: warning.date } : {}),
+      });
+    } else if (UNREADABLE_WARNING.test(`${warning.code} ${warning.message}`)) {
       issues.push({
         code: "unreadable_warning",
         message: warning.message,

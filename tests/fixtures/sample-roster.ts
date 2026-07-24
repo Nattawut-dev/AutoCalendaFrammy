@@ -1,4 +1,5 @@
 import type { RosterAnalysis, RosterShift } from "@/lib/types";
+import { weekdayForIsoDate } from "@/lib/utils/date";
 
 const shifts: Array<[string, string, string | null, string | null]> = [
   ["01", "I8", "09:00", "18:00"],
@@ -39,18 +40,23 @@ export const sampleRoster: RosterAnalysis = {
   month: 7,
   year: 2026,
   timezone: "Asia/Bangkok",
-  shifts: shifts.map<RosterShift>(([day, code, start, end]) => ({
-    date: `2026-07-${day}`,
-    code,
-    start,
-    end,
-    isDayOff: code === "OFF",
-    source: "roster",
-    confidence: 0.99,
-    status: "NORMAL",
-    statusConfidence: 1,
-    rawCellText: code,
-  })),
+  printedOffCount: 10,
+  shifts: shifts.map<RosterShift>(([day, code, start, end]) => {
+    const date = `2026-07-${day}`;
+    return {
+      date,
+      printedWeekday: weekdayForIsoDate(date),
+      code,
+      start,
+      end,
+      isDayOff: code === "OFF",
+      source: "roster",
+      confidence: 0.99,
+      status: "NORMAL",
+      statusConfidence: 1,
+      rawCellText: code,
+    };
+  }),
   specialEvents: [
     {
       date: "2026-07-09",

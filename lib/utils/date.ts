@@ -1,3 +1,15 @@
+import type { PrintedWeekday } from "@/lib/types";
+
+const WEEKDAYS: readonly PrintedWeekday[] = [
+  "SUN",
+  "MON",
+  "TUE",
+  "WED",
+  "THU",
+  "FRI",
+  "SAT",
+];
+
 export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
@@ -11,6 +23,12 @@ export function isValidIsoDate(value: string): boolean {
     date.getUTCMonth() === month - 1 &&
     date.getUTCDate() === day
   );
+}
+
+export function weekdayForIsoDate(value: string): PrintedWeekday | null {
+  if (!isValidIsoDate(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()] ?? null;
 }
 
 export function isValidTime(value: string): boolean {

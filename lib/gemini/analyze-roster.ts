@@ -1,14 +1,23 @@
 import "server-only";
 
-import { ApiError } from "@google/genai";
+import {
+  ApiError,
+  MediaResolution,
+  ThinkingLevel,
+  type Schema,
+} from "@google/genai";
 import { getEnv } from "@/lib/env";
 import { GeminiAnalysisError, type GeminiFailureReason } from "@/lib/errors";
 import { getGeminiClient } from "@/lib/gemini/client";
 import {
+  ROSTER_AUDIT_PROMPT,
+  ROSTER_AUDIT_RESPONSE_SCHEMA,
   ROSTER_ANALYSIS_PROMPT,
   ROSTER_RESPONSE_SCHEMA,
 } from "@/lib/gemini/prompt";
+import { applyIndependentAudit } from "@/lib/roster/audit";
 import { normalizeRoster } from "@/lib/roster/normalize";
+import { rosterAuditSchema } from "@/lib/schemas";
 import type { RosterAnalysis } from "@/lib/types";
 
 export type GeminiFailure = {
@@ -50,36 +59,86 @@ export function classifyGeminiFailure(error: unknown): GeminiFailure {
   return { reason: "unknown", status: error.status };
 }
 
+export function createVisionConfig(model: string, responseSchema: Schema) {
+  const isGemini3 = /^gemini-3(?:\.|$)/.test(model);
+  return {
+    temperature: 0,
+    responseMimeType: "application/json",
+    responseSchema,
+    ...(isGemini3
+      ? {
+          mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+        }
+      : {}),
+  };
+}
+
 export async function analyzeRosterImage(
   image: Uint8Array,
   mimeType: "image/jpeg" | "image/png",
 ): Promise<RosterAnalysis> {
   const model = getEnv().GEMINI_MODEL;
   try {
-    const response = await getGeminiClient().models.generateContent({
-      model,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: ROSTER_ANALYSIS_PROMPT },
-            {
-              inlineData: {
-                mimeType,
-                data: Buffer.from(image).toString("base64"),
+    const imageData = Buffer.from(image).toString("base64");
+    const client = getGeminiClient();
+    const [analysisResponse, auditResponse] = await Promise.all([
+      client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: ROSTER_ANALYSIS_PROMPT },
+              {
+                inlineData: {
+                  mimeType,
+                  data: imageData,
+                },
               },
-            },
-          ],
-        },
-      ],
-      config: {
-        temperature: 0,
-        responseMimeType: "application/json",
-        responseSchema: ROSTER_RESPONSE_SCHEMA,
-      },
-    });
-    if (!response.text) throw new Error("empty model response");
-    return normalizeRoster(JSON.parse(response.text));
+            ],
+          },
+        ],
+        config: createVisionConfig(model, ROSTER_RESPONSE_SCHEMA),
+      }),
+      client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: ROSTER_AUDIT_PROMPT },
+              {
+                inlineData: {
+                  mimeType,
+                  data: imageData,
+                },
+              },
+            ],
+          },
+        ],
+        config: createVisionConfig(model, ROSTER_AUDIT_RESPONSE_SCHEMA),
+      }),
+    ]);
+    if (!analysisResponse.text || !auditResponse.text) {
+      throw new Error("empty model response");
+    }
+    const roster = normalizeRoster(JSON.parse(analysisResponse.text));
+    const audit = rosterAuditSchema.parse(JSON.parse(auditResponse.text));
+    const auditedRoster = applyIndependentAudit(roster, audit);
+    const mismatchCount = auditedRoster.warnings.filter((warning) =>
+      warning.code.startsWith("independent_"),
+    ).length;
+    console.info(
+      JSON.stringify({
+        level: "info",
+        operation: "gemini_roster_verification",
+        result: mismatchCount === 0 ? "matched" : "mismatch",
+        mismatchCount,
+        model,
+      }),
+    );
+    return auditedRoster;
   } catch (error) {
     const failure = classifyGeminiFailure(error);
     console.error(

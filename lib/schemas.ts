@@ -3,9 +3,19 @@ import { ROSTER_STATUSES } from "@/lib/roster/status";
 
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 const localTime = /^([01]\d|2[0-3]):[0-5]\d$/;
+export const printedWeekdaySchema = z.enum([
+  "SUN",
+  "MON",
+  "TUE",
+  "WED",
+  "THU",
+  "FRI",
+  "SAT",
+]);
 
 export const rosterShiftSchema = z.object({
   date: z.string().regex(isoDate),
+  printedWeekday: printedWeekdaySchema.nullable().default(null),
   code: z.string().min(1).max(24),
   start: z.string().regex(localTime).nullable(),
   end: z.string().regex(localTime).nullable(),
@@ -38,6 +48,7 @@ export const rosterAnalysisSchema = z.object({
   month: z.number().int().min(1).max(12),
   year: z.number().int().min(2020).max(2100),
   timezone: z.literal("Asia/Bangkok"),
+  printedOffCount: z.number().int().min(0).max(31).nullable().default(null),
   shifts: z.array(rosterShiftSchema).min(1).max(31),
   specialEvents: z.array(specialEventSchema).max(100),
   warnings: z.array(rosterWarningSchema).max(100),
@@ -55,4 +66,23 @@ export const storedRosterJobSchema = z.object({
 
 export const lineWebhookSchema = z.object({
   events: z.array(z.record(z.string(), z.unknown())).default([]),
+});
+
+export const rosterAuditSchema = z.object({
+  employee: z.literal("NANCHAYA"),
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020).max(2100),
+  printedOffCount: z.number().int().min(0).max(31).nullable(),
+  cells: z
+    .array(
+      z.object({
+        day: z.number().int().min(1).max(31),
+        printedWeekday: printedWeekdaySchema,
+        code: z.string().min(1).max(24),
+        rawCellText: z.string().min(1).max(80),
+        confidence: z.number().min(0).max(1),
+      }),
+    )
+    .min(1)
+    .max(31),
 });

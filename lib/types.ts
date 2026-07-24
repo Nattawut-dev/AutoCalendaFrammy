@@ -10,8 +10,12 @@ export type RosterStatus =
   | "SICK_LEAVE"
   | "SHIFT_CHANGE";
 
+export type PrintedWeekday =
+  "SUN" | "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT";
+
 export type RosterShift = {
   date: string;
+  printedWeekday: PrintedWeekday | null;
   code: string;
   start: string | null;
   end: string | null;
@@ -44,6 +48,7 @@ export type RosterAnalysis = {
   month: number;
   year: number;
   timezone: "Asia/Bangkok";
+  printedOffCount: number | null;
   shifts: RosterShift[];
   specialEvents: SpecialEvent[];
   warnings: RosterWarning[];
@@ -65,4 +70,20 @@ export type ValidationIssue = {
   code: string;
   message: string;
   date?: string;
+};
+
+export type RosterAuditCell = {
+  day: number;
+  printedWeekday: PrintedWeekday;
+  code: string;
+  rawCellText: string;
+  confidence: number;
+};
+
+export type RosterAudit = {
+  employee: "NANCHAYA";
+  month: number;
+  year: number;
+  printedOffCount: number | null;
+  cells: RosterAuditCell[];
 };
