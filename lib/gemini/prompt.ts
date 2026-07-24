@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Type, type Schema } from "@google/genai";
+import { ROSTER_STATUSES } from "@/lib/roster/status";
 
 export const ROSTER_ANALYSIS_PROMPT = `
 Analyze this employee roster image by inspecting its visual table structure, not only OCR text.
@@ -11,6 +12,11 @@ Mandatory rules:
 - Read the roster month and year from the title.
 - Match every numbered date column to the corresponding NANCHAYA cell.
 - Read shift-code start/end definitions from the DETAILS or legend table in the image.
+- Extract the printed shift code and its start/end time exactly as before. Status color is separate metadata and must never change, replace, or override the shift code or its time.
+- Inspect the background color of each NANCHAYA roster cell and compare it only with the color legend printed in the same image.
+- Map legend meanings to status exactly as follows: SWITCH SHIFT -> SWITCH_SHIFT, CHANGE DAY OFF -> CHANGE_DAY_OFF, DAY OFF REQUEST -> DAY_OFF_REQUEST, OT -> OT, VACATION -> VACATION, BL or BUSINESS LEAVE -> BUSINESS_LEAVE, OT DAYOFF -> OT_DAYOFF, SL or SICK LEAVE -> SICK_LEAVE, SHIFT CHANGE -> SHIFT_CHANGE.
+- Use NORMAL when the cell has no colored status, the legend has no matching entry, or the color cannot be distinguished reliably. Never infer a status from the shift code or text color alone.
+- statusConfidence measures only the cell-background-to-legend match. If the status color is ambiguous, use NORMAL, lower statusConfidence, and add a warning with code status_color_uncertain. This uncertainty must not reduce the shift-code confidence when the printed code itself is clear.
 - Read only REMARK entries that explicitly include NANCHAYA.
 - OFF means a day off. Use code OFF, isDayOff true, and null start/end.
 - Do not invent blurry, cropped, unreadable, or missing values. Record uncertainty in warnings.
@@ -65,6 +71,8 @@ export const ROSTER_RESPONSE_SCHEMA = {
           "isDayOff",
           "source",
           "confidence",
+          "status",
+          "statusConfidence",
           "rawCellText",
         ],
         properties: {
@@ -79,6 +87,12 @@ export const ROSTER_RESPONSE_SCHEMA = {
             enum: ["roster"],
           },
           confidence: { type: Type.NUMBER },
+          status: {
+            type: Type.STRING,
+            format: "enum",
+            enum: [...ROSTER_STATUSES],
+          },
+          statusConfidence: { type: Type.NUMBER },
           rawCellText: { type: Type.STRING, nullable: true },
         },
       },

@@ -82,6 +82,8 @@ describe("roster validation", () => {
       isDayOff: false,
       source: "roster",
       confidence: 0.99,
+      status: "NORMAL",
+      statusConfidence: 1,
       rawCellText: "I8",
     }));
     const roster: RosterAnalysis = {

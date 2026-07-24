@@ -47,6 +47,8 @@ export const sampleRoster: RosterAnalysis = {
     isDayOff: code === "OFF",
     source: "roster",
     confidence: 0.99,
+    status: "NORMAL",
+    statusConfidence: 1,
     rawCellText: code,
   })),
   specialEvents: [

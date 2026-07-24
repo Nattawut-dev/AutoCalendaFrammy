@@ -11,11 +11,13 @@
 3. ตรวจ allowlist และ idempotency ใน Redis
 4. ดาวน์โหลด JPEG/PNG จาก LINE (ไม่เกิน 10 MB) และตรวจ magic bytes
 5. ส่ง bytes ให้ Gemini ผ่าน `@google/genai` พร้อม JSON Schema
-6. normalize และ validate ข้อมูลครบทุกวันของเดือน รวม confidence และ warnings
+6. normalize และ validate ข้อมูลครบทุกวันของเดือน รวม confidence, สีสถานะจาก legend และ warnings
 7. เก็บงานชั่วคราวใน Redis และตอบ LINE ด้วย preview ภาษาไทย
 8. เมื่อกดยืนยัน ระบบออก signed URL พร้อม `openExternalBrowser=1` เพื่อเปิดเบราว์เซอร์ภายนอกจาก LINE และสร้าง ICS แบบ dynamic ที่ `GET /api/calendar/[jobId]/NANCHAYA-YYYY-MM.ics` โดย route เดิม `GET /api/calendar/[jobId]` ยังรองรับลิงก์ที่ออกไว้ก่อนหน้า
 
 กิจกรรมจาก REMARK เช่น Training จะเป็น VEVENT แยกจากกะทำงานและสามารถซ้อนเวลาได้ กะทำงานจะไม่ถูกลด ตัด หรือรวมกับกิจกรรม
+
+ระบบอ่านสีพื้นของช่อง NANCHAYA เทียบกับ legend ที่พิมพ์อยู่ในภาพ โดยเก็บสถานะแยกจากรหัสกะและเวลา สีที่ไม่ชัดจะไม่ถูกใช้เปลี่ยนข้อมูลกะ ในไฟล์ Calendar ระบบใส่ทั้ง `COLOR` ตาม RFC 7986 และ emoji สีในชื่อกิจกรรม เนื่องจาก Apple Calendar อาจแสดงสีตาม Calendar แทนสีรายกิจกรรม emoji จึงเป็นตัวบอกสีที่มองเห็นได้เสมอ
 
 ## A. สิ่งที่ต้องมี
 
@@ -134,7 +136,7 @@ API routes ใช้ Node.js runtime และ webhook ตั้ง maximum dura
 
 1. เพิ่มบอตเป็นเพื่อนใน LINE
 2. ส่งภาพหรือ screenshot ตารางเวรเต็มเดือนที่คมชัดและเห็น title, date headers, แถว NANCHAYA, DETAILS และ REMARK
-3. ตรวจ preview ทุกวัน รวมวัน OFF และกิจกรรมพิเศษ
+3. ตรวจ preview ทุกวัน รวมรหัสกะ สีสถานะ วัน OFF และกิจกรรมพิเศษ
 4. ถ้าถูกต้อง กด **ยืนยันสร้าง Calendar**
 5. กด **เพิ่มเข้า Apple Calendar** หรือเปิด plain URL สำรอง
 6. บน iPhone เลือกเพิ่มกิจกรรมทั้งหมดลง Calendar ที่ต้องการ

@@ -1,3 +1,15 @@
+export type RosterStatus =
+  | "NORMAL"
+  | "SWITCH_SHIFT"
+  | "CHANGE_DAY_OFF"
+  | "DAY_OFF_REQUEST"
+  | "OT"
+  | "VACATION"
+  | "BUSINESS_LEAVE"
+  | "OT_DAYOFF"
+  | "SICK_LEAVE"
+  | "SHIFT_CHANGE";
+
 export type RosterShift = {
   date: string;
   code: string;
@@ -6,6 +18,8 @@ export type RosterShift = {
   isDayOff: boolean;
   source: "roster";
   confidence: number;
+  status: RosterStatus;
+  statusConfidence: number;
   rawCellText: string | null;
 };
 

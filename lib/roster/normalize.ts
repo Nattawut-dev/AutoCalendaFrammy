@@ -1,4 +1,5 @@
 import { rosterAnalysisSchema } from "@/lib/schemas";
+import { MIN_STATUS_CONFIDENCE } from "@/lib/constants";
 import type { RosterAnalysis } from "@/lib/types";
 import { cleanText } from "@/lib/utils/text";
 
@@ -33,14 +34,34 @@ export function normalizeRoster(input: unknown): RosterAnalysis {
       (a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start),
     );
 
+  const warnings = parsed.warnings.map((warning) => ({
+    ...warning,
+    code: cleanText(warning.code),
+    message: cleanText(warning.message),
+  }));
+  const statusWarningDates = new Set(
+    warnings
+      .filter((warning) => warning.code === "status_color_uncertain")
+      .map((warning) => warning.date),
+  );
+  for (const shift of shifts) {
+    if (
+      shift.statusConfidence < MIN_STATUS_CONFIDENCE &&
+      !statusWarningDates.has(shift.date)
+    ) {
+      warnings.push({
+        code: "status_color_uncertain",
+        message:
+          "สีสถานะมีความมั่นใจต่ำ ระบบจึงไม่ใช้สีนี้เปลี่ยนรหัสกะหรือเวลา",
+        date: shift.date,
+      });
+    }
+  }
+
   return {
     ...parsed,
     shifts,
     specialEvents,
-    warnings: parsed.warnings.map((warning) => ({
-      ...warning,
-      code: cleanText(warning.code),
-      message: cleanText(warning.message),
-    })),
+    warnings,
   };
 }

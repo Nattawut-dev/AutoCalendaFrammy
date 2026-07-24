@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROSTER_STATUSES } from "@/lib/roster/status";
 
 const isoDate = /^\d{4}-\d{2}-\d{2}$/;
 const localTime = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -11,6 +12,8 @@ export const rosterShiftSchema = z.object({
   isDayOff: z.boolean(),
   source: z.literal("roster"),
   confidence: z.number().min(0).max(1),
+  status: z.enum(ROSTER_STATUSES).default("NORMAL"),
+  statusConfidence: z.number().min(0).max(1).default(1),
   rawCellText: z.string().nullable(),
 });
 

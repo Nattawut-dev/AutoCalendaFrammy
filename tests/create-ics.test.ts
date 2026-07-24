@@ -17,8 +17,8 @@ describe("ICS generation", () => {
   it("creates all work shifts and the special event while omitting OFF days", () => {
     const ics = createRosterIcs(sampleRoster);
     expect(countOccurrences(ics, "BEGIN:VEVENT")).toBe(22);
-    expect(ics).not.toContain("SUMMARY:NANCHAYA — กะ OFF");
-    expect(ics).toContain("SUMMARY:ERP TRAINING");
+    expect(ics).not.toContain("กะ OFF");
+    expect(ics).toContain("ERP TRAINING");
   });
 
   it("preserves overlapping work and training events", () => {
@@ -42,6 +42,39 @@ describe("ICS generation", () => {
     expect(ics).toContain("TZID:Asia/Bangkok");
     expect(ics).toContain("TZOFFSETTO:+0700");
     expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20260701T090000");
+    expect(ics).toContain("DTSTART:19700101T000000");
+    expect(ics).not.toContain("DTSTART;TZID=Asia/Bangkok:19700101T000000");
+  });
+
+  it("adds distinct colors and visible markers for normal shift codes", () => {
+    const ics = createRosterIcs(sampleRoster);
+    expect(ics).toContain("COLOR:dodgerblue");
+    expect(ics).toContain("COLOR:orange");
+    expect(ics).toContain("🔵 NANCHAYA — กะ F9");
+    expect(ics).toContain("🟠 NANCHAYA — กะ K9");
+  });
+
+  it("uses a roster status color without changing shift time", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[0].status = "OT";
+    roster.shifts[0].statusConfidence = 0.99;
+    const ics = createRosterIcs(roster);
+    expect(ics).toContain("COLOR:magenta");
+    expect(ics).toContain("🟣 NANCHAYA — กะ I8 · OT");
+    expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20260701T090000");
+    expect(ics).toContain("DTEND;TZID=Asia/Bangkok:20260701T180000");
+  });
+
+  it("creates an all-day event for a colored day-off status", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[3].status = "VACATION";
+    roster.shifts[3].statusConfidence = 0.99;
+    const ics = createRosterIcs(roster);
+    expect(countOccurrences(ics, "BEGIN:VEVENT")).toBe(23);
+    expect(ics).toContain("COLOR:red");
+    expect(ics).toContain("SUMMARY:🔴 NANCHAYA — VACATION");
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260704");
+    expect(ics).toContain("DURATION:P1D");
   });
 
   it("escapes malicious text and blocks newline property injection", () => {

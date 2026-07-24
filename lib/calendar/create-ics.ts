@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { createEvents, type EventAttributes } from "ics";
+import { rosterPresentation, STATUS_PRESENTATION } from "@/lib/roster/status";
 import type { RosterAnalysis } from "@/lib/types";
 import { addOneDay } from "@/lib/utils/date";
 import { sanitizeFilename } from "@/lib/utils/text";
@@ -44,6 +45,7 @@ function commonEvent(input: {
   title: string;
   description: string;
   uidParts: string[];
+  categories: string[];
 }): EventAttributes {
   return {
     start: dateTimeArray(input.date, input.start),
@@ -57,6 +59,7 @@ function commonEvent(input: {
     endOutputType: "local",
     title: input.title,
     description: input.description,
+    categories: input.categories,
     uid: deterministicUid(input.uidParts),
     status: "CONFIRMED",
     alarms: [
@@ -69,6 +72,31 @@ function commonEvent(input: {
   };
 }
 
+function allDayStatusEvent(input: {
+  date: string;
+  title: string;
+  description: string;
+  uidParts: string[];
+  categories: string[];
+}): EventAttributes {
+  const [year, month, day] = input.date.split("-").map(Number);
+  return {
+    start: [year, month, day],
+    duration: { days: 1 },
+    title: input.title,
+    description: input.description,
+    categories: input.categories,
+    uid: deterministicUid(input.uidParts),
+    status: "CONFIRMED",
+    transp: "TRANSPARENT",
+  };
+}
+
+type ColoredEvent = {
+  attributes: EventAttributes;
+  color: string;
+};
+
 export function calendarFilename(
   roster: Pick<RosterAnalysis, "year" | "month">,
 ): string {
@@ -78,18 +106,44 @@ export function calendarFilename(
 }
 
 export function createRosterIcs(roster: RosterAnalysis): string {
-  const events: EventAttributes[] = [];
+  const events: ColoredEvent[] = [];
 
   for (const shift of roster.shifts) {
-    if (shift.isDayOff || !shift.start || !shift.end) continue;
-    const title = `NANCHAYA — กะ ${shift.code}`;
-    events.push(
-      commonEvent({
+    const presentation = rosterPresentation(shift.status, shift.code);
+    const statusDescription =
+      shift.status === "NORMAL"
+        ? ""
+        : `\nสถานะ: ${STATUS_PRESENTATION[shift.status].label}`;
+    if (shift.isDayOff || !shift.start || !shift.end) {
+      if (shift.status === "NORMAL") continue;
+      events.push({
+        attributes: allDayStatusEvent({
+          date: shift.date,
+          title: `${presentation.emoji} NANCHAYA — ${presentation.label}`,
+          description: `รหัสในตาราง: ${shift.code}${statusDescription}\nนำเข้าจากตารางเวรผ่าน LINE Bot`,
+          uidParts: [
+            roster.employee,
+            shift.date,
+            shift.code,
+            shift.source,
+            "all-day-status",
+          ],
+          categories: ["ROSTER", shift.status],
+        }),
+        color: presentation.icsColor,
+      });
+      continue;
+    }
+    const statusTitle =
+      shift.status === "NORMAL" ? "" : ` · ${presentation.label}`;
+    const title = `${presentation.emoji} NANCHAYA — กะ ${shift.code}${statusTitle}`;
+    events.push({
+      attributes: commonEvent({
         date: shift.date,
         start: shift.start,
         end: shift.end,
         title,
-        description: `รหัสกะ: ${shift.code}\nนำเข้าจากตารางเวรผ่าน LINE Bot`,
+        description: `รหัสกะ: ${shift.code}${statusDescription}\nนำเข้าจากตารางเวรผ่าน LINE Bot`,
         uidParts: [
           roster.employee,
           shift.date,
@@ -98,17 +152,19 @@ export function createRosterIcs(roster: RosterAnalysis): string {
           shift.code,
           shift.source,
         ],
+        categories: ["ROSTER", shift.status, shift.code],
       }),
-    );
+      color: presentation.icsColor,
+    });
   }
 
   for (const special of roster.specialEvents) {
-    events.push(
-      commonEvent({
+    events.push({
+      attributes: commonEvent({
         date: special.date,
         start: special.start,
         end: special.end,
-        title: special.title,
+        title: `🟣 ${special.title}`,
         description: "กิจกรรมจาก REMARK\nสามารถซ้อนกับกะทำงานได้",
         uidParts: [
           roster.employee,
@@ -118,22 +174,33 @@ export function createRosterIcs(roster: RosterAnalysis): string {
           special.title,
           special.source,
         ],
+        categories: ["REMARK"],
       }),
-    );
+      color: "mediumpurple",
+    });
   }
 
   const calName = `NANCHAYA Roster ${roster.year}-${String(roster.month).padStart(2, "0")}`;
-  const result = createEvents(events, {
-    calName,
-    productId: PRODUCT_ID,
-    method: "PUBLISH",
-  });
+  const result = createEvents(
+    events.map((event) => event.attributes),
+    {
+      calName,
+      productId: PRODUCT_ID,
+      method: "PUBLISH",
+    },
+  );
   if (result.error || !result.value) {
     throw new Error("Unable to generate calendar");
   }
 
+  let colorIndex = 0;
   return result.value
-    .replace("BEGIN:VEVENT\r\n", `${BANGKOK_TIMEZONE}\r\nBEGIN:VEVENT\r\n`)
     .replace(/^DTSTART:/gm, "DTSTART;TZID=Asia/Bangkok:")
-    .replace(/^DTEND:/gm, "DTEND;TZID=Asia/Bangkok:");
+    .replace(/^DTEND:/gm, "DTEND;TZID=Asia/Bangkok:")
+    .replace("BEGIN:VEVENT\r\n", `${BANGKOK_TIMEZONE}\r\nBEGIN:VEVENT\r\n`)
+    .replace(/BEGIN:VEVENT\r\n/g, (line) => {
+      const color = events[colorIndex]?.color;
+      colorIndex += 1;
+      return color ? `${line}COLOR:${color}\r\n` : line;
+    });
 }

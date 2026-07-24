@@ -4,6 +4,7 @@ export const JOB_TTL_SECONDS = 30 * 60;
 export const DOWNLOAD_TOKEN_TTL_SECONDS = 15 * 60;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MIN_SHIFT_CONFIDENCE = 0.88;
+export const MIN_STATUS_CONFIDENCE = 0.8;
 export const MIN_SPECIAL_EVENT_CONFIDENCE = 0.85;
 
 export const KNOWN_SHIFT_TIMES: Readonly<

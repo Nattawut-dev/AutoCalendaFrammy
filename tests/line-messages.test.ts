@@ -37,4 +37,15 @@ describe("LINE messages", () => {
     expect(messages.at(-1)?.type).toBe("flex");
     expect(messages).toHaveLength(3);
   });
+
+  it("shows shift and roster-status markers in the review", () => {
+    const job = readyJob();
+    job.roster = structuredClone(sampleRoster);
+    job.roster.shifts[0].status = "SHIFT_CHANGE";
+    job.roster.shifts[0].statusConfidence = 0.99;
+    const messages = createPreviewMessages(job);
+    expect(JSON.stringify(messages)).toContain("🟢 I8 · SHIFT CHANGE");
+    expect(JSON.stringify(messages)).toContain("🔵 F9");
+    expect(JSON.stringify(messages)).toContain("🟠 K9");
+  });
 });

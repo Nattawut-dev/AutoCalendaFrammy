@@ -1,5 +1,6 @@
 import type { LineMessage } from "@/lib/line/client";
 import { textMessage } from "@/lib/line/messages";
+import { rosterPresentation, STATUS_PRESENTATION } from "@/lib/roster/status";
 import { summarizeRoster } from "@/lib/roster/summarize";
 import type { StoredRosterJob } from "@/lib/types";
 import { formatThaiMonth } from "@/lib/utils/date";
@@ -109,9 +110,14 @@ export function createPreviewMessages(job: StoredRosterJob): LineMessage[] {
   const month = formatThaiMonth(job.roster.month);
   const shiftLines = job.roster.shifts.map((shift) => {
     const day = Number(shift.date.slice(-2));
+    const presentation = rosterPresentation(shift.status, shift.code);
+    const status =
+      shift.status === "NORMAL"
+        ? ""
+        : ` · ${STATUS_PRESENTATION[shift.status].label}`;
     return shift.isDayOff
-      ? `${day} ${month} — OFF`
-      : `${day} ${month} — ${shift.code} — ${shift.start}–${shift.end}`;
+      ? `${day} ${month} — ${presentation.emoji} OFF${status}`
+      : `${day} ${month} — ${presentation.emoji} ${shift.code}${status} — ${shift.start}–${shift.end}`;
   });
   const specialLines = job.roster.specialEvents.map((event) => {
     const day = Number(event.date.slice(-2));
