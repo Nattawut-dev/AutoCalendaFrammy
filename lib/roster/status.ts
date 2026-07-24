@@ -22,32 +22,32 @@ type StatusPresentation = {
 export const STATUS_PRESENTATION: Readonly<
   Record<RosterStatus, StatusPresentation>
 > = {
-  NORMAL: { label: "ปกติ", emoji: "⚪", icsColor: "gray" },
+  NORMAL: { label: "ปกติ", emoji: "🤍", icsColor: "gray" },
   SWITCH_SHIFT: {
     label: "SWITCH SHIFT",
-    emoji: "🩵",
+    emoji: "🦋",
     icsColor: "turquoise",
   },
   CHANGE_DAY_OFF: {
     label: "CHANGE DAY OFF",
-    emoji: "🟠",
+    emoji: "🍊",
     icsColor: "darkorange",
   },
   DAY_OFF_REQUEST: {
     label: "DAY OFF REQUEST",
-    emoji: "🟡",
+    emoji: "🌼",
     icsColor: "lightyellow",
   },
-  OT: { label: "OT", emoji: "🟣", icsColor: "magenta" },
-  VACATION: { label: "VACATION", emoji: "🔴", icsColor: "red" },
+  OT: { label: "OT", emoji: "💜", icsColor: "magenta" },
+  VACATION: { label: "VACATION", emoji: "🌹", icsColor: "red" },
   BUSINESS_LEAVE: {
     label: "BUSINESS LEAVE",
-    emoji: "🟨",
+    emoji: "🌻",
     icsColor: "gold",
   },
   OT_DAYOFF: {
     label: "OT DAYOFF",
-    emoji: "🔵",
+    emoji: "💙",
     icsColor: "royalblue",
   },
   SICK_LEAVE: {
@@ -57,7 +57,7 @@ export const STATUS_PRESENTATION: Readonly<
   },
   SHIFT_CHANGE: {
     label: "SHIFT CHANGE",
-    emoji: "🟢",
+    emoji: "🍀",
     icsColor: "limegreen",
   },
 };
@@ -65,13 +65,13 @@ export const STATUS_PRESENTATION: Readonly<
 const SHIFT_PRESENTATION: Readonly<
   Record<string, Pick<StatusPresentation, "emoji" | "icsColor">>
 > = {
-  F9: { emoji: "🔵", icsColor: "dodgerblue" },
-  K9: { emoji: "🟠", icsColor: "orange" },
-  HH9: { emoji: "🟣", icsColor: "mediumpurple" },
-  JJ9: { emoji: "🟡", icsColor: "gold" },
-  M7: { emoji: "🟢", icsColor: "seagreen" },
-  L8: { emoji: "🟤", icsColor: "sienna" },
-  I8: { emoji: "🩵", icsColor: "deepskyblue" },
+  F9: { emoji: "🩵", icsColor: "dodgerblue" },
+  K9: { emoji: "🧡", icsColor: "orange" },
+  HH9: { emoji: "💜", icsColor: "mediumpurple" },
+  JJ9: { emoji: "💛", icsColor: "gold" },
+  M7: { emoji: "💚", icsColor: "seagreen" },
+  L8: { emoji: "🤎", icsColor: "sienna" },
+  I8: { emoji: "💙", icsColor: "deepskyblue" },
 };
 
 export function shiftPresentation(
@@ -79,7 +79,7 @@ export function shiftPresentation(
 ): Pick<StatusPresentation, "emoji" | "icsColor"> {
   return (
     SHIFT_PRESENTATION[code] ?? {
-      emoji: "⚪",
+      emoji: "🤍",
       icsColor: "gray",
     }
   );

@@ -164,7 +164,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
         date: special.date,
         start: special.start,
         end: special.end,
-        title: `🟣 ${special.title}`,
+        title: `🌷 ${special.title}`,
         description: "กิจกรรมจาก REMARK\nสามารถซ้อนกับกะทำงานได้",
         uidParts: [
           roster.employee,
