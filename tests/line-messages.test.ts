@@ -53,6 +53,7 @@ describe("LINE messages", () => {
     expect(JSON.stringify(messages)).toContain("💙 I8 · 🎀 SHIFT CHANGE");
     expect(JSON.stringify(messages)).toContain("🩵 F9 · 🎀 SHIFT CHANGE");
     expect(JSON.stringify(messages)).toContain("🧡 K9 · 🎀 SHIFT CHANGE");
+    expect(JSON.stringify(messages)).toContain("4 ก.ค. — OFF");
     expect(JSON.stringify(messages)).not.toContain("— 🤍 OFF");
   });
 });

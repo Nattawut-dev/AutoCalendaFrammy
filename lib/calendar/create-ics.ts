@@ -99,7 +99,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
       shift.status === "NORMAL"
         ? ""
         : ` · ${statusPresentation.emoji} ${statusPresentation.label}`;
-    const title = `${shiftMarker} NANCHAYA — กะ ${shift.code}${statusTitle}`;
+    const title = `กะ ${shift.code} ${shiftMarker}${statusTitle}`;
     events.push({
       attributes: commonEvent({
         date: shift.date,

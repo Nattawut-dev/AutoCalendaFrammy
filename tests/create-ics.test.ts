@@ -51,8 +51,9 @@ describe("ICS generation", () => {
     expect(countOccurrences(ics, "COLOR:mediumpurple")).toBe(22);
     expect(ics).not.toContain("COLOR:dodgerblue");
     expect(ics).not.toContain("COLOR:orange");
-    expect(ics).toContain("🩵 NANCHAYA — กะ F9");
-    expect(ics).toContain("🧡 NANCHAYA — กะ K9");
+    expect(ics).toContain("SUMMARY:กะ F9 🩵");
+    expect(ics).toContain("SUMMARY:กะ K9 🧡");
+    expect(ics).not.toContain("SUMMARY:NANCHAYA");
   });
 
   it("uses a roster status color without changing shift time", () => {
@@ -61,7 +62,7 @@ describe("ICS generation", () => {
     roster.shifts[0].statusConfidence = 0.99;
     const ics = createRosterIcs(roster);
     expect(ics).toContain("COLOR:mediumpurple");
-    expect(ics).toContain("💙 NANCHAYA — กะ I8 · 💜 OT");
+    expect(ics).toContain("SUMMARY:กะ I8 💙 · 💜 OT");
     expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20260701T090000");
     expect(ics).toContain("DTEND;TZID=Asia/Bangkok:20260701T180000");
   });

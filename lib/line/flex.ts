@@ -108,18 +108,17 @@ function splitDetails(lines: string[], heading: string): LineMessage[] {
 
 export function createPreviewMessages(job: StoredRosterJob): LineMessage[] {
   const month = formatThaiMonth(job.roster.month);
-  const shiftLines = job.roster.shifts
-    .filter((shift) => !shift.isDayOff)
-    .map((shift) => {
-      const day = Number(shift.date.slice(-2));
-      const shiftMarker = shiftPresentation(shift.code).emoji;
-      const statusPresentation = STATUS_PRESENTATION[shift.status];
-      const status =
-        shift.status === "NORMAL"
-          ? ""
-          : ` · ${statusPresentation.emoji} ${statusPresentation.label}`;
-      return `${day} ${month} — ${shiftMarker} ${shift.code}${status} — ${shift.start}–${shift.end}`;
-    });
+  const shiftLines = job.roster.shifts.map((shift) => {
+    const day = Number(shift.date.slice(-2));
+    if (shift.isDayOff) return `${day} ${month} — OFF`;
+    const shiftMarker = shiftPresentation(shift.code).emoji;
+    const statusPresentation = STATUS_PRESENTATION[shift.status];
+    const status =
+      shift.status === "NORMAL"
+        ? ""
+        : ` · ${statusPresentation.emoji} ${statusPresentation.label}`;
+    return `${day} ${month} — ${shiftMarker} ${shift.code}${status} — ${shift.start}–${shift.end}`;
+  });
   const specialLines = job.roster.specialEvents.map((event) => {
     const day = Number(event.date.slice(-2));
     return `${day} ${month} — ${event.title} — ${event.start}–${event.end}`;
