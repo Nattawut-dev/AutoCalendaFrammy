@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { createEvents, type EventAttributes } from "ics";
-import { rosterPresentation, STATUS_PRESENTATION } from "@/lib/roster/status";
+import { shiftPresentation, STATUS_PRESENTATION } from "@/lib/roster/status";
 import type { RosterAnalysis } from "@/lib/types";
 import { addOneDay } from "@/lib/utils/date";
 import { sanitizeFilename } from "@/lib/utils/text";
@@ -73,26 +73,6 @@ function commonEvent(input: {
   };
 }
 
-function allDayStatusEvent(input: {
-  date: string;
-  title: string;
-  description: string;
-  uidParts: string[];
-  categories: string[];
-}): EventAttributes {
-  const [year, month, day] = input.date.split("-").map(Number);
-  return {
-    start: [year, month, day],
-    duration: { days: 1 },
-    title: input.title,
-    description: input.description,
-    categories: input.categories,
-    uid: deterministicUid(input.uidParts),
-    status: "CONFIRMED",
-    transp: "TRANSPARENT",
-  };
-}
-
 type ColoredEvent = {
   attributes: EventAttributes;
   color: string;
@@ -110,34 +90,16 @@ export function createRosterIcs(roster: RosterAnalysis): string {
   const events: ColoredEvent[] = [];
 
   for (const shift of roster.shifts) {
-    const presentation = rosterPresentation(shift.status, shift.code);
+    const shiftMarker = shiftPresentation(shift.code).emoji;
+    const statusPresentation = STATUS_PRESENTATION[shift.status];
     const statusDescription =
+      shift.status === "NORMAL" ? "" : `\nสถานะ: ${statusPresentation.label}`;
+    if (shift.isDayOff || !shift.start || !shift.end) continue;
+    const statusTitle =
       shift.status === "NORMAL"
         ? ""
-        : `\nสถานะ: ${STATUS_PRESENTATION[shift.status].label}`;
-    if (shift.isDayOff || !shift.start || !shift.end) {
-      if (shift.status === "NORMAL") continue;
-      events.push({
-        attributes: allDayStatusEvent({
-          date: shift.date,
-          title: `${presentation.emoji} NANCHAYA — ${presentation.label}`,
-          description: `รหัสในตาราง: ${shift.code}${statusDescription}\nนำเข้าจากตารางเวรผ่าน LINE Bot`,
-          uidParts: [
-            roster.employee,
-            shift.date,
-            shift.code,
-            shift.source,
-            "all-day-status",
-          ],
-          categories: ["ROSTER", shift.status],
-        }),
-        color: EVENT_BACKGROUND_COLOR,
-      });
-      continue;
-    }
-    const statusTitle =
-      shift.status === "NORMAL" ? "" : ` · ${presentation.label}`;
-    const title = `${presentation.emoji} NANCHAYA — กะ ${shift.code}${statusTitle}`;
+        : ` · ${statusPresentation.emoji} ${statusPresentation.label}`;
+    const title = `${shiftMarker} NANCHAYA — กะ ${shift.code}${statusTitle}`;
     events.push({
       attributes: commonEvent({
         date: shift.date,

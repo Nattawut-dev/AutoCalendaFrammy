@@ -61,21 +61,19 @@ describe("ICS generation", () => {
     roster.shifts[0].statusConfidence = 0.99;
     const ics = createRosterIcs(roster);
     expect(ics).toContain("COLOR:mediumpurple");
-    expect(ics).toContain("💜 NANCHAYA — กะ I8 · OT");
+    expect(ics).toContain("💙 NANCHAYA — กะ I8 · 💜 OT");
     expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20260701T090000");
     expect(ics).toContain("DTEND;TZID=Asia/Bangkok:20260701T180000");
   });
 
-  it("creates an all-day event for a colored day-off status", () => {
+  it("keeps a colored day-off status empty in the calendar", () => {
     const roster = cloneSampleRoster();
     roster.shifts[3].status = "VACATION";
     roster.shifts[3].statusConfidence = 0.99;
     const ics = createRosterIcs(roster);
-    expect(countOccurrences(ics, "BEGIN:VEVENT")).toBe(23);
-    expect(ics).toContain("COLOR:mediumpurple");
-    expect(ics).toContain("SUMMARY:🌹 NANCHAYA — VACATION");
-    expect(ics).toContain("DTSTART;VALUE=DATE:20260704");
-    expect(ics).toContain("DURATION:P1D");
+    expect(countOccurrences(ics, "BEGIN:VEVENT")).toBe(22);
+    expect(ics).not.toContain("NANCHAYA — VACATION");
+    expect(ics).not.toContain("DTSTART;VALUE=DATE:20260704");
   });
 
   it("escapes malicious text and blocks newline property injection", () => {

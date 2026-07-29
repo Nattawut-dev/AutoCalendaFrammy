@@ -57,7 +57,7 @@ export const STATUS_PRESENTATION: Readonly<
   },
   SHIFT_CHANGE: {
     label: "SHIFT CHANGE",
-    emoji: "🍀",
+    emoji: "🎀",
     icsColor: "limegreen",
   },
 };
@@ -83,15 +83,4 @@ export function shiftPresentation(
       icsColor: "gray",
     }
   );
-}
-
-export function rosterPresentation(
-  status: RosterStatus,
-  shiftCode: string,
-): StatusPresentation {
-  if (status !== "NORMAL") return STATUS_PRESENTATION[status];
-  return {
-    label: "ปกติ",
-    ...shiftPresentation(shiftCode),
-  };
 }
