@@ -46,10 +46,11 @@ describe("ICS generation", () => {
     expect(ics).not.toContain("DTSTART;TZID=Asia/Bangkok:19700101T000000");
   });
 
-  it("adds distinct colors and visible markers for normal shift codes", () => {
+  it("keeps a purple background while markers distinguish shift codes", () => {
     const ics = createRosterIcs(sampleRoster);
-    expect(ics).toContain("COLOR:dodgerblue");
-    expect(ics).toContain("COLOR:orange");
+    expect(countOccurrences(ics, "COLOR:mediumpurple")).toBe(22);
+    expect(ics).not.toContain("COLOR:dodgerblue");
+    expect(ics).not.toContain("COLOR:orange");
     expect(ics).toContain("🩵 NANCHAYA — กะ F9");
     expect(ics).toContain("🧡 NANCHAYA — กะ K9");
   });
@@ -59,7 +60,7 @@ describe("ICS generation", () => {
     roster.shifts[0].status = "OT";
     roster.shifts[0].statusConfidence = 0.99;
     const ics = createRosterIcs(roster);
-    expect(ics).toContain("COLOR:magenta");
+    expect(ics).toContain("COLOR:mediumpurple");
     expect(ics).toContain("💜 NANCHAYA — กะ I8 · OT");
     expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20260701T090000");
     expect(ics).toContain("DTEND;TZID=Asia/Bangkok:20260701T180000");
@@ -71,7 +72,7 @@ describe("ICS generation", () => {
     roster.shifts[3].statusConfidence = 0.99;
     const ics = createRosterIcs(roster);
     expect(countOccurrences(ics, "BEGIN:VEVENT")).toBe(23);
-    expect(ics).toContain("COLOR:red");
+    expect(ics).toContain("COLOR:mediumpurple");
     expect(ics).toContain("SUMMARY:🌹 NANCHAYA — VACATION");
     expect(ics).toContain("DTSTART;VALUE=DATE:20260704");
     expect(ics).toContain("DURATION:P1D");

@@ -8,6 +8,7 @@ import { addOneDay } from "@/lib/utils/date";
 import { sanitizeFilename } from "@/lib/utils/text";
 
 const PRODUCT_ID = "-//NANCHAYA Roster Bot//TH";
+const EVENT_BACKGROUND_COLOR = "mediumpurple";
 const BANGKOK_TIMEZONE = [
   "BEGIN:VTIMEZONE",
   "TZID:Asia/Bangkok",
@@ -130,7 +131,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
           ],
           categories: ["ROSTER", shift.status],
         }),
-        color: presentation.icsColor,
+        color: EVENT_BACKGROUND_COLOR,
       });
       continue;
     }
@@ -154,7 +155,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
         ],
         categories: ["ROSTER", shift.status, shift.code],
       }),
-      color: presentation.icsColor,
+      color: EVENT_BACKGROUND_COLOR,
     });
   }
 
@@ -176,7 +177,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
         ],
         categories: ["REMARK"],
       }),
-      color: "mediumpurple",
+      color: EVENT_BACKGROUND_COLOR,
     });
   }
 
