@@ -134,6 +134,7 @@ describe("roster validation", () => {
         status: "NORMAL",
         statusConfidence: 1,
         rawCellText: "I8",
+        coworkers: [],
       };
     });
     const roster: RosterAnalysis = {

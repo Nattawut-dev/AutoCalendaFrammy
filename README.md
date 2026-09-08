@@ -139,8 +139,8 @@ API routes ใช้ Node.js runtime และ webhook ตั้ง maximum dura
 ## I. วิธีใช้งาน
 
 1. เพิ่มบอตเป็นเพื่อนใน LINE
-2. ส่งภาพหรือ screenshot ตารางเวรเต็มเดือนที่คมชัดและเห็น title, date headers, แถว NANCHAYA, DETAILS และ REMARK
-3. ตรวจ preview ทุกวัน รวมรหัสกะ สีสถานะ วัน OFF และกิจกรรมพิเศษ
+2. ส่งภาพหรือ screenshot ตารางเวรเต็มเดือนที่คมชัดและเห็น title, date headers และแถว NANCHAYA (ไม่จำเป็นต้องติดตาราง DETAILS หรือ Legend ในภาพ ระบบจดจำเวลากะและสีสถานะมาตรฐานได้อัตโนมัติ)
+3. ตรวจ preview ทุกวัน รวมรหัสกะ สีสถานะ วัน OFF กิจกรรมพิเศษ และเพื่อนร่วมงานที่เข้างานด้วยกันในแต่ละวัน
 4. ถ้าถูกต้อง กด **ยืนยันสร้าง Calendar**
 5. กด **เพิ่มเข้า Apple Calendar** หรือเปิด plain URL สำรอง
 6. บน iPhone เลือกเพิ่มกิจกรรมทั้งหมดลง Calendar ที่ต้องการ
@@ -171,7 +171,7 @@ API routes ใช้ Node.js runtime และ webhook ตั้ง maximum dura
 
 ### Gemini คืนข้อมูลไม่ถูก schema
 
-ส่งภาพที่คมชัดขึ้น crop ให้ยังเห็น title, date headers, NANCHAYA, DETAILS และ REMARK ครบ ตรวจว่า model ใน `GEMINI_MODEL` รองรับ image input และ structured JSON output
+ส่งภาพที่คมชัดขึ้น crop ให้ยังเห็น title, date headers และ NANCHAYA ครบ ตรวจว่า model ใน `GEMINI_MODEL` รองรับ image input และ structured JSON output
 
 ### Gemini ตอบ `model_not_found` หรือ 404
 

@@ -13,6 +13,11 @@ export type RosterStatus =
 export type PrintedWeekday =
   "SUN" | "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT";
 
+export type RosterCoworker = {
+  name: string;
+  code: string;
+};
+
 export type RosterShift = {
   date: string;
   printedWeekday: PrintedWeekday | null;
@@ -25,6 +30,7 @@ export type RosterShift = {
   status: RosterStatus;
   statusConfidence: number;
   rawCellText: string | null;
+  coworkers: RosterCoworker[];
 };
 
 export type SpecialEvent = {

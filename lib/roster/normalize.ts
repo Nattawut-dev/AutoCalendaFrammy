@@ -1,5 +1,5 @@
 import { rosterAnalysisSchema } from "@/lib/schemas";
-import { MIN_STATUS_CONFIDENCE } from "@/lib/constants";
+import { KNOWN_SHIFT_TIMES, MIN_STATUS_CONFIDENCE } from "@/lib/constants";
 import type { RosterAnalysis } from "@/lib/types";
 import { cleanText } from "@/lib/utils/text";
 
@@ -12,12 +12,22 @@ export function normalizeRoster(input: unknown): RosterAnalysis {
     .map((shift) => {
       const rawCode = cleanText(shift.code).toUpperCase();
       const isOff = shift.isDayOff || OFF_PATTERN.test(rawCode);
+      const knownTime = KNOWN_SHIFT_TIMES[rawCode];
+      const start = isOff ? null : shift.start || knownTime?.start || null;
+      const end = isOff ? null : shift.end || knownTime?.end || null;
+      const coworkers = isOff
+        ? []
+        : (shift.coworkers ?? []).map((c) => ({
+            name: cleanText(c.name).toUpperCase(),
+            code: cleanText(c.code).toUpperCase(),
+          }));
       return {
         ...shift,
         code: isOff ? "OFF" : rawCode,
         isDayOff: isOff,
-        start: isOff ? null : shift.start,
-        end: isOff ? null : shift.end,
+        start,
+        end,
+        coworkers,
         rawCellText:
           shift.rawCellText === null ? null : cleanText(shift.rawCellText),
       };

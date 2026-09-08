@@ -94,6 +94,10 @@ export function createRosterIcs(roster: RosterAnalysis): string {
     const statusPresentation = STATUS_PRESENTATION[shift.status];
     const statusDescription =
       shift.status === "NORMAL" ? "" : `\nสถานะ: ${statusPresentation.label}`;
+    const coworkersDescription =
+      shift.coworkers && shift.coworkers.length > 0
+        ? `\nเข้างานกับ: ${shift.coworkers.map((c) => `${c.name} (${c.code})`).join(", ")}`
+        : "";
     if (shift.isDayOff || !shift.start || !shift.end) continue;
     const statusTitle =
       shift.status === "NORMAL"
@@ -106,7 +110,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
         start: shift.start,
         end: shift.end,
         title,
-        description: `รหัสกะ: ${shift.code}${statusDescription}\nนำเข้าจากตารางเวรผ่าน LINE Bot`,
+        description: `รหัสกะ: ${shift.code}${statusDescription}${coworkersDescription}`,
         uidParts: [
           roster.employee,
           shift.date,

@@ -10,17 +10,38 @@ Analyze this employee roster image by inspecting its visual table structure, not
 
 Mandatory rules:
 - Locate the employee row whose name is exactly NANCHAYA.
-- Do not extract shifts for MINTRA, SUNISA, JANTARAS, or any other employee.
 - Read the roster month and year from the title.
 - First pass — shift text only: ignore all cell background colors. Match every numbered date column and its printed weekday header to the corresponding NANCHAYA cell, then read the printed code in each cell from left to right.
-- Read shift-code start/end definitions from the DETAILS or legend table in the image.
+- Shift time definitions:
+  - If a DETAILS or legend table is visible in the image, read the shift-code start/end definitions from it.
+  - If no DETAILS or legend table is present in the image (e.g. cropped roster grid), use these standard shift definitions:
+    * F9: 06:00 - 16:00
+    * HH9: 08:30 - 18:30
+    * JJ9: 10:30 - 20:30
+    * K9: 11:00 - 21:00
+    * M7: 13:00 - 21:00
+    * L8: 12:00 - 21:00
+    * I8: 09:00 - 18:00
 - Read the printed OFF total at the far right of the NANCHAYA row into printedOffCount. Never use another employee's OFF total. Use null only if this total is absent or genuinely unreadable.
 - Count the extracted OFF cells and compare that count with printedOffCount. If they differ, re-check date alignment and every NANCHAYA cell before returning. Never change a clear cell merely to force the count to match. If the mismatch cannot be resolved from the image, preserve the visually supported codes, lower confidence only on ambiguous cells, and add a warning with code off_count_mismatch.
-- Extract the printed shift code and its start/end time exactly as read. Status color is separate metadata and must never change, replace, or override the shift code, OFF value, or its time.
-- Second pass — status color only: inspect the background color of each already-read NANCHAYA cell and compare it only with the color legend printed in the same image.
-- Map legend meanings to status exactly as follows: SWITCH SHIFT -> SWITCH_SHIFT, CHANGE DAY OFF -> CHANGE_DAY_OFF, DAY OFF REQUEST -> DAY_OFF_REQUEST, OT -> OT, VACATION -> VACATION, BL or BUSINESS LEAVE -> BUSINESS_LEAVE, OT DAYOFF -> OT_DAYOFF, SL or SICK LEAVE -> SICK_LEAVE, SHIFT CHANGE -> SHIFT_CHANGE.
-- Use NORMAL when the cell has no colored status, the legend has no matching entry, or the color cannot be distinguished reliably. Never infer a status from the shift code or text color alone.
+- Extract the printed shift code and its start/end time. Status color is separate metadata and must never change, replace, or override the shift code, OFF value, or its time.
+- Second pass — status color: inspect the background color and text markers of each already-read NANCHAYA cell. Even if no legend is printed in the image, map cell colors and markers according to these standard definitions:
+  * Cyan / Turquoise: SWITCH_SHIFT (SWITCH SHIFT)
+  * Orange: CHANGE_DAY_OFF (CHANGE DAY OFF)
+  * Light Yellow / Pale Yellow / Cream: DAY_OFF_REQUEST (DAY OFF REQUEST)
+  * Magenta / Fuchsia: OT (OT)
+  * Red: VACATION (VACATION)
+  * Olive / Mustard / Yellow-green or text contains "BL": BUSINESS_LEAVE (BUSINESS LEAVE)
+  * Slate Blue / Medium Blue or text contains "OT DAYOFF": OT_DAYOFF (OT DAYOFF)
+  * Light Pink / Peach or text contains "SL": SICK_LEAVE (SICK LEAVE)
+  * Light Green / Lime: SHIFT_CHANGE (SHIFT CHANGE)
+  * Plain white / uncolored: NORMAL
+- If a color legend is visible in the image, compare against both the visible legend and the standard definitions above.
+- Use NORMAL when the cell has no colored status or the color cannot be distinguished reliably. Never infer a status from the shift code alone.
 - statusConfidence measures only the cell-background-to-legend match. If the status color is ambiguous, use NORMAL, lower statusConfidence, and add a warning with code status_color_uncertain. This uncertainty must not reduce the shift-code confidence when the printed code itself is clear.
+- Coworkers on duty:
+  - For each date column where NANCHAYA is working (not OFF): inspect all other employee rows in the table (e.g. MINTRA, SUNISA, JANTARAS). Extract every colleague who is also working on that same date (exclude colleagues whose code is OFF, leave, or absent) into the coworkers array ({ name: "EMPLOYEE_NAME", code: "SHIFT_CODE" }). Normalize employee names to clean uppercase.
+  - If NANCHAYA is OFF on that date or no other colleagues are working, return an empty array [] for coworkers.
 - Read only REMARK entries that explicitly include NANCHAYA.
 - OFF means a day off. Use code OFF, isDayOff true, and null start/end.
 - Do not invent blurry, cropped, unreadable, or missing values. Record uncertainty in warnings.
@@ -83,6 +104,7 @@ export const ROSTER_RESPONSE_SCHEMA = {
           "status",
           "statusConfidence",
           "rawCellText",
+          "coworkers",
         ],
         properties: {
           date: { type: Type.STRING },
@@ -108,6 +130,17 @@ export const ROSTER_RESPONSE_SCHEMA = {
           },
           statusConfidence: { type: Type.NUMBER },
           rawCellText: { type: Type.STRING, nullable: true },
+          coworkers: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              required: ["name", "code"],
+              properties: {
+                name: { type: Type.STRING },
+                code: { type: Type.STRING },
+              },
+            },
+          },
         },
       },
     },

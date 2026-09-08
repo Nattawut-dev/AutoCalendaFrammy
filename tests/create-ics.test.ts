@@ -104,4 +104,12 @@ describe("ICS generation", () => {
   it("returns the safe required filename", () => {
     expect(calendarFilename(sampleRoster)).toBe("NANCHAYA-2026-07.ics");
   });
+
+  it("includes coworkers in event description and omits line bot footer", () => {
+    const ics = createRosterIcs(sampleRoster);
+    expect(ics).toContain(
+      "DESCRIPTION:รหัสกะ: I8\\nเข้างานกับ: MINTRA (L8)\\, SUNISA (L8)",
+    );
+    expect(ics).not.toContain("นำเข้าจากตารางเวรผ่าน LINE Bot");
+  });
 });

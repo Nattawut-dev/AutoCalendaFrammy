@@ -9,7 +9,7 @@ export function textMessage(text: string): LineMessage {
 
 export function createHelpMessage(): LineMessage {
   return textMessage(
-    "วิธีใช้: ส่งภาพตารางเวรที่ชัดเจน 1 ภาพ โดยให้เห็นชื่อเดือน/ปี หัววันที่ แถว NANCHAYA ตาราง DETAILS และส่วน REMARK ครบถ้วน ระบบจะให้ตรวจสอบก่อนสร้างไฟล์ Calendar",
+    "วิธีใช้: ส่งภาพตารางเวรที่ชัดเจน 1 ภาพ โดยให้เห็นชื่อเดือน/ปี หัววันที่ และแถว NANCHAYA (ไม่จำเป็นต้องมีตาราง DETAILS) ระบบจะแสดงกะ เพื่อนร่วมงาน และให้ตรวจสอบก่อนสร้าง Calendar",
   );
 }
 
@@ -21,7 +21,7 @@ export function createReviewRequiredMessage(
     .map((issue) => `${issue.date ? `${issue.date}: ` : ""}${issue.message}`)
     .join("\n");
   return textMessage(
-    `พบข้อมูลบางส่วนที่ต้องตรวจสอบ จึงยังไม่สร้าง Calendar:\n${details}\nกรุณาส่งรูปใหม่ที่คมชัดและให้เห็นแถว NANCHAYA, หัววันที่, DETAILS และ REMARK ครบถ้วน`,
+    `พบข้อมูลบางส่วนที่ต้องตรวจสอบ จึงยังไม่สร้าง Calendar:\n${details}\nกรุณาส่งรูปใหม่ที่คมชัดและให้เห็นแถว NANCHAYA และหัววันที่ครบถ้วน (ไม่จำเป็นต้องมีตาราง DETAILS)`,
   );
 }
 
@@ -53,7 +53,7 @@ export function createUnauthorizedMessage(): LineMessage {
 
 export function createGenericAnalysisErrorMessage(): LineMessage {
   return textMessage(
-    "ไม่สามารถอ่านรูปนี้ได้ กรุณาส่งภาพที่ชัดขึ้นและให้เห็นแถว NANCHAYA, หัววันที่, DETAILS และ REMARK ครบถ้วน",
+    "ไม่สามารถอ่านรูปนี้ได้ กรุณาส่งภาพที่ชัดขึ้นและให้เห็นแถว NANCHAYA และหัววันที่ครบถ้วน",
   );
 }
 

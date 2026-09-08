@@ -48,4 +48,33 @@ describe("roster normalization", () => {
       date: "2026-07-01",
     });
   });
+
+  it("populates missing start and end times from KNOWN_SHIFT_TIMES", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[0].start = null;
+    roster.shifts[0].end = null;
+    roster.shifts[1].start = null;
+    roster.shifts[1].end = null;
+
+    const normalized = normalizeRoster(roster);
+    expect(normalized.shifts[0].code).toBe("I8");
+    expect(normalized.shifts[0].start).toBe("09:00");
+    expect(normalized.shifts[0].end).toBe("18:00");
+    expect(normalized.shifts[1].code).toBe("L8");
+    expect(normalized.shifts[1].start).toBe("12:00");
+    expect(normalized.shifts[1].end).toBe("21:00");
+  });
+
+  it("normalizes coworker names and codes and empties them for OFF days", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[0].coworkers = [{ name: " mintra ", code: " l8 " }];
+    roster.shifts[3].coworkers = [{ name: "SUNISA", code: "L8" }];
+
+    const normalized = normalizeRoster(roster);
+    expect(normalized.shifts[0].coworkers).toEqual([
+      { name: "MINTRA", code: "L8" },
+    ]);
+    expect(normalized.shifts[3].isDayOff).toBe(true);
+    expect(normalized.shifts[3].coworkers).toEqual([]);
+  });
 });

@@ -13,6 +13,11 @@ export const printedWeekdaySchema = z.enum([
   "SAT",
 ]);
 
+export const rosterCoworkerSchema = z.object({
+  name: z.string().min(1).max(50),
+  code: z.string().min(1).max(24),
+});
+
 export const rosterShiftSchema = z.object({
   date: z.string().regex(isoDate),
   printedWeekday: printedWeekdaySchema.nullable().default(null),
@@ -25,6 +30,7 @@ export const rosterShiftSchema = z.object({
   status: z.enum(ROSTER_STATUSES).default("NORMAL"),
   statusConfidence: z.number().min(0).max(1).default(1),
   rawCellText: z.string().nullable(),
+  coworkers: z.array(rosterCoworkerSchema).default([]),
 });
 
 export const specialEventSchema = z.object({

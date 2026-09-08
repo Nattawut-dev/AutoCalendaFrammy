@@ -55,6 +55,15 @@ export const sampleRoster: RosterAnalysis = {
       status: "NORMAL",
       statusConfidence: 1,
       rawCellText: code,
+      coworkers:
+        code === "OFF"
+          ? []
+          : day === "01"
+            ? [
+                { name: "MINTRA", code: "L8" },
+                { name: "SUNISA", code: "L8" },
+              ]
+            : [],
     };
   }),
   specialEvents: [

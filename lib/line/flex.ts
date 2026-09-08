@@ -117,7 +117,11 @@ export function createPreviewMessages(job: StoredRosterJob): LineMessage[] {
       shift.status === "NORMAL"
         ? ""
         : ` · ${statusPresentation.emoji} ${statusPresentation.label}`;
-    return `${day} ${month} — ${shiftMarker} ${shift.code}${status} — ${shift.start}–${shift.end}`;
+    const coworkers =
+      shift.coworkers && shift.coworkers.length > 0
+        ? ` (เข้ากับ: ${shift.coworkers.map((c) => `${c.name} [${c.code}]`).join(", ")})`
+        : "";
+    return `${day} ${month} — ${shiftMarker} ${shift.code}${status} — ${shift.start}–${shift.end}${coworkers}`;
   });
   const specialLines = job.roster.specialEvents.map((event) => {
     const day = Number(event.date.slice(-2));
