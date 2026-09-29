@@ -2,6 +2,7 @@ import type { LineMessage } from "@/lib/line/client";
 import type { GeminiFailureReason } from "@/lib/errors";
 import type { ValidationIssue } from "@/lib/types";
 import { truncate } from "@/lib/utils/text";
+import { MANUAL_ROSTER_EXAMPLE } from "@/lib/roster/parse-text";
 
 export function textMessage(text: string): LineMessage {
   return { type: "text", text: truncate(text, 5000) };
@@ -9,7 +10,13 @@ export function textMessage(text: string): LineMessage {
 
 export function createHelpMessage(): LineMessage {
   return textMessage(
-    "วิธีใช้: ส่งภาพตารางเวรที่ชัดเจน 1 ภาพ โดยให้เห็นชื่อเดือน/ปี หัววันที่ และแถว NANCHAYA (ไม่จำเป็นต้องมีตาราง DETAILS) ระบบจะแสดงกะ เพื่อนร่วมงาน และให้ตรวจสอบก่อนสร้าง Calendar",
+    "ส่งภาพตารางเวรที่เห็นเดือน/ปี หัววันที่ และแถว NANCHAYA หรือพิมพ์ ‘ตาราง’ เพื่อส่งรหัสกะเป็นข้อความโดยไม่ต้องวิเคราะห์ภาพ ทั้งสองแบบจะแสดงตารางให้ตรวจและยืนยันก่อนสร้าง Calendar",
+  );
+}
+
+export function createManualRosterHelpMessage(): LineMessage {
+  return textMessage(
+    `ส่งเดือน ปี และยอด OFF ตามด้วยรหัสกะครบทุกวันเรียงจากวันที่ 1 (เว้นวรรค ขึ้นบรรทัดใหม่ หรือคั่นด้วย comma ได้) รองรับปี ค.ศ. และ พ.ศ.\n\nตัวอย่างเดือนตุลาคม 2026:\n${MANUAL_ROSTER_EXAMPLE}\n\nโหมดนี้สร้างเฉพาะกะตามเวลามาตรฐาน ไม่รวมสีสถานะ เพื่อนร่วมงาน หรือกิจกรรมอบรม วัน OFF จะเว้นว่างในปฏิทิน\nตรวจวันและเวลาในตัวอย่างก่อนยืนยัน หากต้องแก้ให้ยกเลิกงานเดิมแล้วส่งข้อความทั้งเดือนใหม่`,
   );
 }
 
@@ -62,7 +69,7 @@ export function createGeminiErrorMessage(
 ): LineMessage {
   if (reason === "rate_limited") {
     return textMessage(
-      "โควตาการวิเคราะห์รูปเต็มชั่วคราว กรุณารอสักครู่แล้วลองส่งรูปใหม่อีกครั้ง",
+      "โควตาการวิเคราะห์รูปเต็มชั่วคราว พิมพ์ ‘ตาราง’ เพื่อสร้าง Calendar จากรหัสกะเป็นข้อความได้",
     );
   }
   if (reason === "authentication" || reason === "model_not_found") {
@@ -72,7 +79,7 @@ export function createGeminiErrorMessage(
   }
   if (reason === "service_unavailable") {
     return textMessage(
-      "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว กรุณารอสักครู่แล้วส่งรูปใหม่อีกครั้ง",
+      "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว พิมพ์ ‘ตาราง’ เพื่อสร้าง Calendar จากรหัสกะเป็นข้อความได้",
     );
   }
   if (reason === "invalid_request") {

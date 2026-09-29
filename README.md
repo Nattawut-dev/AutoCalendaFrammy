@@ -54,8 +54,10 @@
 
 ## C. ตั้งค่า Gemini
 
+หากต้องการสร้างปฏิทินโดยไม่อ่านภาพ ใช้ [โหมดส่งรหัสกะเป็นข้อความ](docs/text-roster.md) ใน LINE ได้ทันที
+
 1. เข้า [Google AI Studio](https://aistudio.google.com/)
-2. สร้าง API key แล้วใส่ `GEMINI_API_KEY`
+2. สร้าง API key แล้วใส่ `GEMINI_API_KEY` เฉพาะเมื่อต้องการอ่านภาพ (โหมดข้อความไม่ต้องใช้)
 3. ค่าเริ่มต้นของ `GEMINI_MODEL` คือ `gemini-3.8-flash` และเปลี่ยนได้โดยไม่แก้โค้ด
 
 Gemini free tier มีข้อจำกัดจำนวน request/token ซึ่ง Google สามารถเปลี่ยนได้ การจัดการข้อมูลและเงื่อนไขของ free tier อาจต่างจากบริการแบบชำระเงิน จึงควรตรวจเงื่อนไขล่าสุดก่อนใช้กับข้อมูลจริง ระบบนี้ไม่ได้รับประกันว่าจะฟรีหรือใช้งานได้ไม่จำกัดตลอดไป
@@ -85,17 +87,17 @@ openssl rand -base64 48
 
 ## ตัวแปรสภาพแวดล้อมทั้งหมด
 
-| ตัวแปร                      | จำเป็น | รายละเอียด                                                   |
-| --------------------------- | ------ | ------------------------------------------------------------ |
-| `LINE_CHANNEL_SECRET`       | ใช่    | Channel secret จาก LINE Developers                           |
-| `LINE_CHANNEL_ACCESS_TOKEN` | ใช่    | Long-lived Messaging API token                               |
-| `GEMINI_API_KEY`            | ใช่    | API key จาก Google AI Studio                                 |
-| `GEMINI_MODEL`              | ไม่    | ค่าเริ่มต้น `gemini-3.8-flash`                               |
-| `UPSTASH_REDIS_REST_URL`    | ใช่    | Upstash REST URL                                             |
-| `UPSTASH_REDIS_REST_TOKEN`  | ใช่    | Upstash REST token                                           |
-| `DOWNLOAD_TOKEN_SECRET`     | ใช่    | ค่าสุ่มอย่างน้อย 32 ตัวอักษร                                 |
-| `ALLOWED_LINE_USER_IDS`     | ใช่    | LINE user ID คั่นด้วย comma                                  |
-| `APP_BASE_URL`              | ใช่    | origin ของระบบ ไม่มี `/` ท้าย URL; production ต้องเป็น HTTPS |
+| ตัวแปร                      | จำเป็น   | รายละเอียด                                                   |
+| --------------------------- | -------- | ------------------------------------------------------------ |
+| `LINE_CHANNEL_SECRET`       | ใช่      | Channel secret จาก LINE Developers                           |
+| `LINE_CHANNEL_ACCESS_TOKEN` | ใช่      | Long-lived Messaging API token                               |
+| `GEMINI_API_KEY`            | เฉพาะภาพ | API key จาก Google AI Studio; เว้นว่างได้ถ้าใช้โหมดข้อความ   |
+| `GEMINI_MODEL`              | ไม่      | ค่าเริ่มต้น `gemini-3.8-flash`                               |
+| `UPSTASH_REDIS_REST_URL`    | ใช่      | Upstash REST URL                                             |
+| `UPSTASH_REDIS_REST_TOKEN`  | ใช่      | Upstash REST token                                           |
+| `DOWNLOAD_TOKEN_SECRET`     | ใช่      | ค่าสุ่มอย่างน้อย 32 ตัวอักษร                                 |
+| `ALLOWED_LINE_USER_IDS`     | ใช่      | LINE user ID คั่นด้วย comma                                  |
+| `APP_BASE_URL`              | ใช่      | origin ของระบบ ไม่มี `/` ท้าย URL; production ต้องเป็น HTTPS |
 
 ดูรูปแบบได้ใน `.env.example`
 

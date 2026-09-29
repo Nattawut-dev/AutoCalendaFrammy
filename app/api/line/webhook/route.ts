@@ -20,12 +20,14 @@ import {
   createGeminiErrorMessage,
   createGenericAnalysisErrorMessage,
   createHelpMessage,
+  createManualRosterHelpMessage,
   createReviewRequiredMessage,
   createUnauthorizedMessage,
   textMessage,
 } from "@/lib/line/messages";
 import { verifyLineSignature } from "@/lib/line/signature";
 import { validateRoster } from "@/lib/roster/validate";
+import { parseTextRoster } from "@/lib/roster/parse-text";
 import {
   createDownloadToken,
   createUserBinding,
@@ -102,15 +104,46 @@ async function handleImage(event: WebhookEvent, userId: string): Promise<void> {
   await safeReply(event.replyToken, createPreviewMessages(job));
 }
 
-async function handleText(event: WebhookEvent): Promise<void> {
+async function handleText(event: WebhookEvent, userId: string): Promise<void> {
   const message = z
-    .object({ type: z.literal("text"), text: z.string() })
+    .object({ id: z.string(), type: z.literal("text"), text: z.string() })
     .passthrough()
     .parse(event.message);
   const normalized = message.text.trim().toLowerCase();
   if (["help", "ช่วยเหลือ", "วิธีใช้"].includes(normalized)) {
     await safeReply(event.replyToken, [createHelpMessage()]);
+    return;
   }
+  if (["ตาราง", "กะ", "roster"].includes(normalized)) {
+    await safeReply(event.replyToken, [createManualRosterHelpMessage()]);
+    return;
+  }
+  const result = parseTextRoster(message.text);
+  if (!result) return;
+  if (!result.ok) {
+    await safeReply(event.replyToken, [
+      textMessage(
+        `ยังไม่สร้าง Calendar: ${result.error}\nแก้ข้อความแล้วส่งใหม่ หรือพิมพ์ ‘ตาราง’ เพื่อดูตัวอย่าง`,
+      ),
+    ]);
+    return;
+  }
+  const validation = validateRoster(result.roster);
+  if (!validation.confirmable) {
+    await safeReply(event.replyToken, [
+      textMessage(
+        `กรุณาแก้ข้อความแล้วส่งใหม่:\n${validation.issues.map((issue) => issue.message).join("\n")}`,
+      ),
+    ]);
+    return;
+  }
+  const job = await createRosterJob({
+    userId: hashLineUserId(userId),
+    roster: result.roster,
+    sourceMessageId: message.id,
+    status: "ready",
+  });
+  await safeReply(event.replyToken, createPreviewMessages(job));
 }
 
 async function handlePostback(
@@ -142,7 +175,9 @@ async function handlePostback(
     Date.parse(job.expiresAt) <= Date.now()
   ) {
     await safeReply(event.replyToken, [
-      textMessage("งานนี้หมดอายุหรือไม่พบข้อมูล กรุณาส่งรูปใหม่"),
+      textMessage(
+        "งานนี้หมดอายุหรือไม่พบข้อมูล กรุณาส่งรูปหรือข้อความตารางใหม่",
+      ),
     ]);
     return;
   }
@@ -159,7 +194,7 @@ async function handlePostback(
     !validateRoster(job.roster).confirmable
   ) {
     await safeReply(event.replyToken, [
-      textMessage("ข้อมูลยังไม่พร้อมยืนยัน กรุณาส่งรูปที่ชัดเจนกว่าเดิม"),
+      textMessage("ข้อมูลยังไม่พร้อมยืนยัน กรุณาตรวจและส่งตารางใหม่"),
     ]);
     return;
   }
@@ -194,7 +229,7 @@ async function processEvent(event: WebhookEvent): Promise<void> {
       .passthrough()
       .safeParse(event.message);
     if (messageType.data?.type === "image") await handleImage(event, userId);
-    if (messageType.data?.type === "text") await handleText(event);
+    if (messageType.data?.type === "text") await handleText(event, userId);
   } else if (event.type === "postback") {
     await handlePostback(event, userId);
   }

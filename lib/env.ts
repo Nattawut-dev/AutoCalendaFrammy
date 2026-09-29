@@ -10,7 +10,7 @@ const serverEnvSchema = z
   .object({
     LINE_CHANNEL_SECRET: z.string().min(1),
     LINE_CHANNEL_ACCESS_TOKEN: z.string().min(1),
-    GEMINI_API_KEY: z.string().min(1),
+    GEMINI_API_KEY: z.string().optional(),
     GEMINI_MODEL: z
       .string()
       .default(DEFAULT_GEMINI_MODEL)

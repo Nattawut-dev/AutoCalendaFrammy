@@ -51,6 +51,7 @@ export type RosterWarning = {
 
 export type RosterAnalysis = {
   employee: "NANCHAYA";
+  inputMethod?: "image" | "text";
   month: number;
   year: number;
   timezone: "Asia/Bangkok";

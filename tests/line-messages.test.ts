@@ -28,10 +28,10 @@ function readyJob(): StoredRosterJob {
 }
 
 describe("LINE messages", () => {
-  it("tells users to resend the image after an upstream outage", () => {
+  it("offers text entry after an upstream outage", () => {
     expect(createGeminiErrorMessage("service_unavailable")).toMatchObject({
       type: "text",
-      text: expect.stringContaining("ส่งรูปใหม่อีกครั้ง"),
+      text: expect.stringContaining("พิมพ์ ‘ตาราง’"),
     });
   });
 
