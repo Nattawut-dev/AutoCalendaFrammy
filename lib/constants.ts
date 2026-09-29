@@ -13,6 +13,7 @@ export const KNOWN_SHIFT_TIMES: Readonly<
   F9: { start: "06:00", end: "16:00" },
   HH9: { start: "08:30", end: "18:30" },
   JJ9: { start: "10:30", end: "20:30" },
+  H8: { start: "08:00", end: "17:00" },
   K9: { start: "11:00", end: "21:00" },
   M7: { start: "13:00", end: "21:00" },
   L8: { start: "12:00", end: "21:00" },

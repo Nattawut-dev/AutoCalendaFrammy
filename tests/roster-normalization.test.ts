@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeRoster } from "@/lib/roster/normalize";
+import { validateRoster } from "@/lib/roster/validate";
 import { cloneSampleRoster } from "@/tests/fixtures/sample-roster";
 
 describe("roster normalization", () => {
@@ -63,6 +64,43 @@ describe("roster normalization", () => {
     expect(normalized.shifts[1].code).toBe("L8");
     expect(normalized.shifts[1].start).toBe("12:00");
     expect(normalized.shifts[1].end).toBe("21:00");
+  });
+
+  it("fills H8 from the documented roster shift when its time is omitted", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[0].code = "H8";
+    roster.shifts[0].rawCellText = "H8";
+    roster.shifts[0].start = null;
+    roster.shifts[0].end = null;
+
+    const normalized = normalizeRoster(roster);
+    expect(normalized.shifts[0]).toMatchObject({
+      code: "H8",
+      start: "08:00",
+      end: "17:00",
+    });
+    expect(
+      validateRoster(normalized).issues.filter((issue) =>
+        ["invalid_time", "known_code_mismatch"].includes(issue.code),
+      ),
+    ).toEqual([]);
+  });
+
+  it("does not overwrite an H8 time read from a visible legend", () => {
+    const roster = cloneSampleRoster();
+    roster.shifts[0].code = "H8";
+    roster.shifts[0].rawCellText = "H8";
+    roster.shifts[0].start = "09:00";
+    roster.shifts[0].end = "18:00";
+
+    const normalized = normalizeRoster(roster);
+    expect(normalized.shifts[0]).toMatchObject({
+      start: "09:00",
+      end: "18:00",
+    });
+    expect(validateRoster(normalized).issues).toContainEqual(
+      expect.objectContaining({ code: "known_code_mismatch" }),
+    );
   });
 
   it("normalizes coworker names and codes and empties them for OFF days", () => {

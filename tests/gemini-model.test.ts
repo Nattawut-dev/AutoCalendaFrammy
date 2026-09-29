@@ -5,7 +5,10 @@ import {
   DEFAULT_GEMINI_MODEL,
   normalizeGeminiModelName,
 } from "@/lib/gemini/model";
-import { ROSTER_RESPONSE_SCHEMA } from "@/lib/gemini/prompt";
+import {
+  ROSTER_ANALYSIS_PROMPT,
+  ROSTER_RESPONSE_SCHEMA,
+} from "@/lib/gemini/prompt";
 
 describe("Gemini model configuration", () => {
   it("uses the required stable default", () => {
@@ -25,6 +28,10 @@ describe("Gemini model configuration", () => {
     expect(
       createVisionConfig("gemini-2.5-flash-lite", ROSTER_RESPONSE_SCHEMA),
     ).not.toHaveProperty("mediaResolution");
+  });
+
+  it("gives the model the H8 reference time when no legend is visible", () => {
+    expect(ROSTER_ANALYSIS_PROMPT).toContain("H8: 08:00 - 17:00");
   });
 
   it.each([
