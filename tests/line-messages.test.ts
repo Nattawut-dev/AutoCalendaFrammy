@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
 import { createPreviewMessages } from "@/lib/line/flex";
-import { createCalendarReadyMessage } from "@/lib/line/messages";
+import {
+  createCalendarReadyMessage,
+  createGeminiErrorMessage,
+} from "@/lib/line/messages";
 import type { StoredRosterJob } from "@/lib/types";
 import { sampleRoster } from "@/tests/fixtures/sample-roster";
 
@@ -25,6 +28,13 @@ function readyJob(): StoredRosterJob {
 }
 
 describe("LINE messages", () => {
+  it("tells users to resend the image after an upstream outage", () => {
+    expect(createGeminiErrorMessage("service_unavailable")).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("ส่งรูปใหม่อีกครั้ง"),
+    });
+  });
+
   it("keeps the Calendar action label within LINE's 20-character limit", () => {
     const parsed = calendarActionSchema.parse(
       createCalendarReadyMessage("https://example.com/calendar.ics"),

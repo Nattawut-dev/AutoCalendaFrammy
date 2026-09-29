@@ -74,10 +74,7 @@ export function createVisionConfig(model: string, responseSchema: Schema) {
   };
 }
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxAttempts = 3,
-): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
@@ -89,7 +86,7 @@ async function withRetry<T>(
         failure.reason === "service_unavailable" ||
         failure.reason === "rate_limited";
       if (!isRetryable || attempt === maxAttempts - 1) throw error;
-      const delayMs = 2000 * Math.pow(2, attempt); // 2s, 4s
+      const delayMs = 2000 * Math.pow(2, attempt) + Math.random() * 500;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }
@@ -101,44 +98,107 @@ export async function analyzeRosterImage(
   mimeType: "image/jpeg" | "image/png",
 ): Promise<RosterAnalysis> {
   const model = getEnv().GEMINI_MODEL;
+  let activeModel = model;
+  let activeStage: "analysis" | "audit" = "analysis";
   try {
     const imageData = Buffer.from(image).toString("base64");
     const client = getGeminiClient();
     const makeImagePart = () => ({
       inlineData: { mimeType, data: imageData },
     });
+    const generateRosterContent = async (
+      stage: "analysis" | "audit",
+      prompt: string,
+      schema: Schema,
+    ) => {
+      const contents = [
+        {
+          role: "user",
+          parts: [{ text: prompt }, makeImagePart()],
+        },
+      ];
+      activeStage = stage;
+      activeModel = model;
+      try {
+        const response = await withRetry(() =>
+          client.models.generateContent({
+            model,
+            contents,
+            config: createVisionConfig(model, schema),
+          }),
+        );
+        return { response, modelUsed: model };
+      } catch (error) {
+        // Preserve the chosen model for all normal requests. Only a persistent
+        // 503 on the new default model is eligible for the previous stable model.
+        if (
+          model !== "gemini-3.8-flash" ||
+          classifyGeminiFailure(error).status !== 503
+        ) {
+          throw error;
+        }
+        const fallbackModel = "gemini-3.6-flash";
+        activeModel = fallbackModel;
+        console.warn(
+          JSON.stringify({
+            level: "warn",
+            operation: "gemini_roster_fallback",
+            stage,
+            fromModel: model,
+            toModel: fallbackModel,
+            status: 503,
+          }),
+        );
+        try {
+          const response = await withRetry(
+            () =>
+              client.models.generateContent({
+                model: fallbackModel,
+                contents,
+                config: createVisionConfig(fallbackModel, schema),
+              }),
+            2,
+          );
+          return { response, modelUsed: fallbackModel };
+        } catch (fallbackError) {
+          const failure = classifyGeminiFailure(fallbackError);
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              operation: "gemini_roster_fallback",
+              stage,
+              result: "failed",
+              toModel: fallbackModel,
+              category: failure.reason,
+              ...(failure.status === undefined
+                ? {}
+                : { status: failure.status }),
+            }),
+          );
+          throw error;
+        }
+      }
+    };
 
     // Sequential to avoid overloading thinking models with concurrent requests
-    const analysisResponse = await withRetry(() =>
-      client.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: ROSTER_ANALYSIS_PROMPT }, makeImagePart()],
-          },
-        ],
-        config: createVisionConfig(model, ROSTER_RESPONSE_SCHEMA),
-      }),
+    const analysis = await generateRosterContent(
+      "analysis",
+      ROSTER_ANALYSIS_PROMPT,
+      ROSTER_RESPONSE_SCHEMA,
     );
-    const auditResponse = await withRetry(() =>
-      client.models.generateContent({
-        model,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: ROSTER_AUDIT_PROMPT }, makeImagePart()],
-          },
-        ],
-        config: createVisionConfig(model, ROSTER_AUDIT_RESPONSE_SCHEMA),
-      }),
+    const auditResult = await generateRosterContent(
+      "audit",
+      ROSTER_AUDIT_PROMPT,
+      ROSTER_AUDIT_RESPONSE_SCHEMA,
     );
 
-    if (!analysisResponse.text || !auditResponse.text) {
+    if (!analysis.response.text || !auditResult.response.text) {
       throw new Error("empty model response");
     }
-    const roster = normalizeRoster(JSON.parse(analysisResponse.text));
-    const audit = rosterAuditSchema.parse(JSON.parse(auditResponse.text));
+    const roster = normalizeRoster(JSON.parse(analysis.response.text));
+    const audit = rosterAuditSchema.parse(
+      JSON.parse(auditResult.response.text),
+    );
     const auditedRoster = applyIndependentAudit(roster, audit);
     const mismatchCount = auditedRoster.warnings.filter((warning) =>
       warning.code.startsWith("independent_"),
@@ -150,6 +210,8 @@ export async function analyzeRosterImage(
         result: mismatchCount === 0 ? "matched" : "mismatch",
         mismatchCount,
         model,
+        analysisModel: analysis.modelUsed,
+        auditModel: auditResult.modelUsed,
       }),
     );
     return auditedRoster;
@@ -161,6 +223,8 @@ export async function analyzeRosterImage(
         operation: "gemini_roster_analysis",
         category: failure.reason,
         model,
+        activeModel,
+        stage: activeStage,
         mimeType,
         imageBytes: image.byteLength,
         ...(failure.status === undefined ? {} : { status: failure.status }),

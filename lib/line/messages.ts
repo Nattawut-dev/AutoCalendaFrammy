@@ -72,7 +72,7 @@ export function createGeminiErrorMessage(
   }
   if (reason === "service_unavailable") {
     return textMessage(
-      "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่ภายหลัง",
+      "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว กรุณารอสักครู่แล้วส่งรูปใหม่อีกครั้ง",
     );
   }
   if (reason === "invalid_request") {

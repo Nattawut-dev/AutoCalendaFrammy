@@ -56,7 +56,7 @@
 
 1. เข้า [Google AI Studio](https://aistudio.google.com/)
 2. สร้าง API key แล้วใส่ `GEMINI_API_KEY`
-3. ค่าเริ่มต้นของ `GEMINI_MODEL` คือ `gemini-2.5-flash-lite` และเปลี่ยนได้โดยไม่แก้โค้ด
+3. ค่าเริ่มต้นของ `GEMINI_MODEL` คือ `gemini-3.8-flash` และเปลี่ยนได้โดยไม่แก้โค้ด
 
 Gemini free tier มีข้อจำกัดจำนวน request/token ซึ่ง Google สามารถเปลี่ยนได้ การจัดการข้อมูลและเงื่อนไขของ free tier อาจต่างจากบริการแบบชำระเงิน จึงควรตรวจเงื่อนไขล่าสุดก่อนใช้กับข้อมูลจริง ระบบนี้ไม่ได้รับประกันว่าจะฟรีหรือใช้งานได้ไม่จำกัดตลอดไป
 
@@ -90,7 +90,7 @@ openssl rand -base64 48
 | `LINE_CHANNEL_SECRET`       | ใช่    | Channel secret จาก LINE Developers                           |
 | `LINE_CHANNEL_ACCESS_TOKEN` | ใช่    | Long-lived Messaging API token                               |
 | `GEMINI_API_KEY`            | ใช่    | API key จาก Google AI Studio                                 |
-| `GEMINI_MODEL`              | ไม่    | ค่าเริ่มต้น `gemini-2.5-flash-lite`                          |
+| `GEMINI_MODEL`              | ไม่    | ค่าเริ่มต้น `gemini-3.8-flash`                               |
 | `UPSTASH_REDIS_REST_URL`    | ใช่    | Upstash REST URL                                             |
 | `UPSTASH_REDIS_REST_TOKEN`  | ใช่    | Upstash REST token                                           |
 | `DOWNLOAD_TOKEN_SECRET`     | ใช่    | ค่าสุ่มอย่างน้อย 32 ตัวอักษร                                 |
@@ -167,7 +167,11 @@ API routes ใช้ Node.js runtime และ webhook ตั้ง maximum dura
 
 ### Gemini ตอบ 429
 
-โควตาหรือ rate limit ของ Gemini เต็ม รอให้ quota reset หรือตรวจ quota ใน Google AI Studio บอตไม่ retry งานวิเคราะห์อัตโนมัติเพื่อไม่เพิ่มค่าใช้จ่ายหรือสร้างงานซ้ำ
+โควตาหรือ rate limit ของ Gemini เต็ม รอให้ quota reset หรือตรวจ quota ใน Google AI Studio บอตจะลองคำขอที่ล้มซ้ำแบบจำกัดจำนวนครั้งก่อนแจ้งให้ส่งภาพใหม่
+
+### Gemini ตอบ 503
+
+Gemini ไม่พร้อมให้บริการชั่วคราว บอตจะลองซ้ำแบบหน่วงเวลา หากใช้ `gemini-3.8-flash` และยังได้ 503 ต่อเนื่อง จะลอง `gemini-3.6-flash` เฉพาะคำขอที่ล้ม การอ่านหลักและการตรวจอิสระยังต้องผ่านทั้งคู่ก่อนสร้าง Calendar ถ้าโมเดลสำรองก็ใช้ไม่ได้ ให้รอสักครู่แล้วส่งรูปใหม่ การ retry ของ webhook เดิมไม่เริ่มวิเคราะห์ใหม่
 
 ### Gemini คืนข้อมูลไม่ถูก schema
 

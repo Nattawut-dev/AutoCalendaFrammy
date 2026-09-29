@@ -9,15 +9,15 @@ import { ROSTER_RESPONSE_SCHEMA } from "@/lib/gemini/prompt";
 
 describe("Gemini model configuration", () => {
   it("uses the required stable default", () => {
-    expect(DEFAULT_GEMINI_MODEL).toBe("gemini-3.6-flash");
+    expect(DEFAULT_GEMINI_MODEL).toBe("gemini-3.8-flash");
   });
 
-  it("uses high-resolution vision and high thinking for Gemini 3", () => {
+  it("uses high-resolution vision and medium thinking for Gemini 3", () => {
     expect(
       createVisionConfig("gemini-3.6-flash", ROSTER_RESPONSE_SCHEMA),
     ).toMatchObject({
       mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+      thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
     });
   });
 
