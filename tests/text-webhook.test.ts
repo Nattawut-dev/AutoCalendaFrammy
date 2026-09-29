@@ -4,6 +4,7 @@ import { POST } from "@/app/api/line/webhook/route";
 import { MANUAL_ROSTER_EXAMPLE } from "@/lib/roster/parse-text";
 import { verifyDownloadToken } from "@/lib/security/download-token";
 import type { StoredRosterJob } from "@/lib/types";
+import { SEPTEMBER_TEXT } from "./fixtures/september-text";
 
 const mocks = vi.hoisted(() => ({
   reply: vi.fn(),
@@ -76,6 +77,21 @@ beforeEach(() => {
 });
 
 describe("manual roster LINE flow", () => {
+  it("keeps the original daily preview and shows remarks separately without Gemini", async () => {
+    await POST(
+      request(textEvent(SEPTEMBER_TEXT + "\nREMARK 1 12:00-13:00 TRAINING")),
+    );
+    expect(mocks.create).toHaveBeenCalledOnce();
+    const messages = mocks.reply.mock.calls[0][1];
+    const preview = JSON.stringify(messages);
+    for (const line of SEPTEMBER_TEXT.split("\n").slice(1))
+      expect(preview).toContain(line);
+    expect(preview).toContain("กิจกรรมจาก REMARK");
+    expect(preview).toContain("1 ก.ย. — TRAINING — 12:00–13:00");
+    expect(messages.length).toBeLessThanOrEqual(5);
+    expect(mocks.analyze).not.toHaveBeenCalled();
+  });
+
   it("previews text input and creates a signed link only after confirmation without Gemini", async () => {
     expect((await POST(request(textEvent()))).status).toBe(200);
     expect(mocks.create).toHaveBeenCalledWith(

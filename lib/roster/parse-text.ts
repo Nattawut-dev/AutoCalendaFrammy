@@ -1,6 +1,10 @@
 import { KNOWN_SHIFT_TIMES } from "@/lib/constants";
 import type { RosterAnalysis } from "@/lib/types";
 import { daysInMonth, weekdayForIsoDate } from "@/lib/utils/date";
+import {
+  parseDailyDetails,
+  parseTextRemarks,
+} from "@/lib/roster/parse-text-details";
 
 export const MANUAL_ROSTER_EXAMPLE = `ตาราง 2026-10 OFF=10
 L8 H8 H8 OFF H8 H8 H8 H8 OFF H8 H8 H8 OFF OFF H8 H8 H8 H8 OFF OFF H8 L8 OFF H8 L8 OFF OFF H8 H8 H8 OFF`;
@@ -35,11 +39,36 @@ export function parseTextRoster(text: string): TextRosterResult | null {
   const offCount = Number(match[3]);
   if (offCount > totalDays)
     return fail(`ยอด OFF ต้องอยู่ระหว่าง 0–${totalDays}`);
-  const codes = (match[4] ?? "")
-    .trim()
-    .toUpperCase()
-    .split(/[\s,]+/)
+  const dateForDay = (day: number) =>
+    `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const lines = (match[4] ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
     .filter(Boolean);
+  const remarkLines = lines.filter((line) => /^REMARK\b/i.test(line));
+  const shiftLines = lines.filter(
+    (line) => !/^REMARK\b/i.test(line) && line !== "รายละเอียดทุกวัน",
+  );
+  let details: ReturnType<typeof parseDailyDetails> | undefined;
+  let specialEvents: RosterAnalysis["specialEvents"];
+  try {
+    specialEvents = parseTextRemarks(remarkLines, dateForDay, totalDays);
+    if (shiftLines.some((line) => /^\d/.test(line))) {
+      details = parseDailyDetails(shiftLines, month, totalDays);
+    }
+  } catch (error) {
+    return fail(
+      error instanceof Error ? error.message : "รายละเอียดตารางไม่ถูกต้อง",
+    );
+  }
+  const codes = details
+    ? Array.from({ length: totalDays }, (_, i) => details!.get(i + 1)!.code)
+    : shiftLines
+        .join(" ")
+        .trim()
+        .toUpperCase()
+        .split(/[\s,]+/)
+        .filter(Boolean);
   if (codes.length !== totalDays) {
     return fail(
       `เดือนนี้มี ${totalDays} วัน แต่ได้รับ ${codes.length} รหัส กรุณาส่งให้ครบเรียงจากวันที่ 1`,
@@ -69,7 +98,8 @@ export function parseTextRoster(text: string): TextRosterResult | null {
       timezone: "Asia/Bangkok",
       printedOffCount: offCount,
       shifts: codes.map((code, index) => {
-        const date = `${year}-${String(month).padStart(2, "0")}-${String(index + 1).padStart(2, "0")}`;
+        const date = dateForDay(index + 1);
+        const detail = details?.get(index + 1);
         const time = code === "OFF" ? undefined : KNOWN_SHIFT_TIMES[code];
         return {
           date,
@@ -80,13 +110,13 @@ export function parseTextRoster(text: string): TextRosterResult | null {
           isDayOff: code === "OFF",
           source: "roster",
           confidence: 1,
-          status: "NORMAL",
+          status: detail?.status ?? "NORMAL",
           statusConfidence: 1,
           rawCellText: code,
-          coworkers: [],
+          coworkers: detail?.coworkers ?? [],
         };
       }),
-      specialEvents: [],
+      specialEvents,
       warnings: [],
     },
   };
