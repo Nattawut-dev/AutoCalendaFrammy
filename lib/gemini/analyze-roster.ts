@@ -68,10 +68,32 @@ export function createVisionConfig(model: string, responseSchema: Schema) {
     ...(isGemini3
       ? {
           mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
         }
       : {}),
   };
+}
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const failure = classifyGeminiFailure(error);
+      const isRetryable =
+        failure.reason === "service_unavailable" ||
+        failure.reason === "rate_limited";
+      if (!isRetryable || attempt === maxAttempts - 1) throw error;
+      const delayMs = 2000 * Math.pow(2, attempt); // 2s, 4s
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
 }
 
 export async function analyzeRosterImage(
@@ -82,44 +104,36 @@ export async function analyzeRosterImage(
   try {
     const imageData = Buffer.from(image).toString("base64");
     const client = getGeminiClient();
-    const [analysisResponse, auditResponse] = await Promise.all([
+    const makeImagePart = () => ({
+      inlineData: { mimeType, data: imageData },
+    });
+
+    // Sequential to avoid overloading thinking models with concurrent requests
+    const analysisResponse = await withRetry(() =>
       client.models.generateContent({
         model,
         contents: [
           {
             role: "user",
-            parts: [
-              { text: ROSTER_ANALYSIS_PROMPT },
-              {
-                inlineData: {
-                  mimeType,
-                  data: imageData,
-                },
-              },
-            ],
+            parts: [{ text: ROSTER_ANALYSIS_PROMPT }, makeImagePart()],
           },
         ],
         config: createVisionConfig(model, ROSTER_RESPONSE_SCHEMA),
       }),
+    );
+    const auditResponse = await withRetry(() =>
       client.models.generateContent({
         model,
         contents: [
           {
             role: "user",
-            parts: [
-              { text: ROSTER_AUDIT_PROMPT },
-              {
-                inlineData: {
-                  mimeType,
-                  data: imageData,
-                },
-              },
-            ],
+            parts: [{ text: ROSTER_AUDIT_PROMPT }, makeImagePart()],
           },
         ],
         config: createVisionConfig(model, ROSTER_AUDIT_RESPONSE_SCHEMA),
       }),
-    ]);
+    );
+
     if (!analysisResponse.text || !auditResponse.text) {
       throw new Error("empty model response");
     }

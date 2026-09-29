@@ -9,7 +9,7 @@ import { ROSTER_RESPONSE_SCHEMA } from "@/lib/gemini/prompt";
 
 describe("Gemini model configuration", () => {
   it("uses the required stable default", () => {
-    expect(DEFAULT_GEMINI_MODEL).toBe("gemini-2.5-flash-lite");
+    expect(DEFAULT_GEMINI_MODEL).toBe("gemini-3.6-flash");
   });
 
   it("uses high-resolution vision and high thinking for Gemini 3", () => {
