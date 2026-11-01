@@ -86,7 +86,14 @@ export function calendarFilename(
   );
 }
 
-export function createRosterIcs(roster: RosterAnalysis): string {
+/**
+ * Feed events are keyed by date (one shift per day), so a corrected month
+ * replaces the old shift instead of adding a second one. Downloaded files keep
+ * their original IDs so calendars that already imported them do not duplicate.
+ */
+type UidStyle = "download" | "feed";
+
+function rosterEvents(roster: RosterAnalysis, uidStyle: UidStyle) {
   const events: ColoredEvent[] = [];
 
   for (const shift of roster.shifts) {
@@ -111,14 +118,17 @@ export function createRosterIcs(roster: RosterAnalysis): string {
         end: shift.end,
         title,
         description: `รหัสกะ: ${shift.code}${statusDescription}${coworkersDescription}`,
-        uidParts: [
-          roster.employee,
-          shift.date,
-          shift.start,
-          shift.end,
-          shift.code,
-          shift.source,
-        ],
+        uidParts:
+          uidStyle === "feed"
+            ? [roster.employee, shift.date, "shift"]
+            : [
+                roster.employee,
+                shift.date,
+                shift.start,
+                shift.end,
+                shift.code,
+                shift.source,
+              ],
         categories: ["ROSTER", shift.status, shift.code],
       }),
       color: EVENT_BACKGROUND_COLOR,
@@ -140,6 +150,7 @@ export function createRosterIcs(roster: RosterAnalysis): string {
           special.end,
           special.title,
           special.source,
+          ...(uidStyle === "feed" ? ["feed"] : []),
         ],
         categories: ["REMARK"],
       }),
@@ -147,7 +158,10 @@ export function createRosterIcs(roster: RosterAnalysis): string {
     });
   }
 
-  const calName = `NANCHAYA Roster ${roster.year}-${String(roster.month).padStart(2, "0")}`;
+  return events;
+}
+
+function renderCalendar(events: ColoredEvent[], calName: string): string {
   const result = createEvents(
     events.map((event) => event.attributes),
     {
@@ -170,4 +184,24 @@ export function createRosterIcs(roster: RosterAnalysis): string {
       colorIndex += 1;
       return color ? `${line}COLOR:${color}\r\n` : line;
     });
+}
+
+export function createRosterIcs(roster: RosterAnalysis): string {
+  return renderCalendar(
+    rosterEvents(roster, "download"),
+    `NANCHAYA Roster ${roster.year}-${String(roster.month).padStart(2, "0")}`,
+  );
+}
+
+export const FEED_CALENDAR_NAME = "NANCHAYA Roster";
+
+/** One subscribed calendar with every stored month; apps refresh it themselves. */
+export function createFeedIcs(rosters: RosterAnalysis[]): string {
+  return renderCalendar(
+    rosters.flatMap((roster) => rosterEvents(roster, "feed")),
+    FEED_CALENDAR_NAME,
+  ).replace(
+    "X-PUBLISHED-TTL:PT1H\r\n",
+    "X-PUBLISHED-TTL:PT1H\r\nREFRESH-INTERVAL;VALUE=DURATION:PT1H\r\n",
+  );
 }

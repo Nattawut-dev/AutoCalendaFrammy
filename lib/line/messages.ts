@@ -10,7 +10,7 @@ export function textMessage(text: string): LineMessage {
 
 export function createHelpMessage(): LineMessage {
   return textMessage(
-    "ส่งภาพตารางเวรที่เห็นเดือน/ปี หัววันที่ และแถว NANCHAYA หรือพิมพ์ ‘ตาราง’ เพื่อส่งรหัสกะเป็นข้อความโดยไม่ต้องวิเคราะห์ภาพ ทั้งสองแบบจะแสดงตารางให้ตรวจและยืนยันก่อนสร้าง Calendar",
+    "ส่งภาพตารางเวรที่เห็นเดือน/ปี หัววันที่ และแถว NANCHAYA หรือพิมพ์ ‘ตาราง’ เพื่อส่งรหัสกะเป็นข้อความโดยไม่ต้องวิเคราะห์ภาพ ทั้งสองแบบจะแสดงตารางให้ตรวจและยืนยันก่อนสร้าง Calendar\n\nพิมพ์ ‘ลิงก์ปฏิทิน’ เพื่อรับลิงก์ปฏิทินที่อัปเดตเองทุกเดือน",
   );
 }
 
@@ -32,26 +32,42 @@ export function createReviewRequiredMessage(
   );
 }
 
+const FEED_SETUP_STEPS = `วิธีเพิ่ม (ทำครั้งเดียว):
+• iPhone: การตั้งค่า > ปฏิทิน > บัญชี > เพิ่มบัญชี > อื่นๆ > เพิ่มปฏิทินที่สมัครรับ แล้ววางลิงก์ (iOS รุ่นใหม่ ปฏิทินอยู่ใต้ "แอป")
+• Google Calendar: เปิด calendar.google.com บนคอมพิวเตอร์ > ปฏิทินอื่นๆ (+) > จาก URL แล้ววางลิงก์
+
+ส่งเดือนใหม่หรือแก้เดือนเดิม ปฏิทินจะอัปเดตเอง (iPhone ประมาณทุกชั่วโมง Google อาจช้าหลายชั่วโมง)
+เก็บย้อนหลัง 12 เดือน
+ลิงก์นี้เป็นความลับ ใครได้ไปจะเห็นตารางเวร พิมพ์ ‘รีเซ็ตลิงก์ปฏิทิน’ เพื่อเปลี่ยนลิงก์`;
+
+/** Full link + setup steps: first time, or when asked with ‘ลิงก์ปฏิทิน’. */
+export function createFeedLinkMessage(url: string, intro: string): LineMessage {
+  return textMessage(`${intro}\n${url}\n\n${FEED_SETUP_STEPS}`);
+}
+
+/** After confirming a month: the calendar link already has it. */
+export function createFeedUpdatedMessage(monthLabel: string): LineMessage {
+  return textMessage(
+    `บันทึกตาราง ${monthLabel} ลงลิงก์ปฏิทินแล้ว ✅\nถ้าเพิ่มลิงก์ปฏิทินไว้แล้ว ไม่ต้องทำอะไรเพิ่ม ปฏิทินจะดึงข้อมูลใหม่เอง\nพิมพ์ ‘ลิงก์ปฏิทิน’ เพื่อดูลิงก์อีกครั้ง`,
+  );
+}
+
 export function createCalendarReadyMessage(url: string): LineMessage {
   return {
     type: "template",
-    altText: "ไฟล์ Apple Calendar พร้อมดาวน์โหลด",
+    altText: "ไฟล์ Calendar เดือนนี้พร้อมดาวน์โหลด",
     template: {
       type: "buttons",
-      text: "ไฟล์ Calendar พร้อมแล้ว ลิงก์ดาวน์โหลดมีอายุ 15 นาที",
+      text: "ไม่ต้องกด ถ้าใช้ลิงก์ปฏิทินแล้ว · ไฟล์เดือนนี้แยกต่างหาก ลิงก์มีอายุ 15 นาที",
       actions: [
         {
           type: "uri",
-          label: "เพิ่มใน Calendar",
+          label: "ดาวน์โหลดเดือนนี้",
           uri: url,
         },
       ],
     },
   };
-}
-
-export function createCalendarUrlFallback(url: string): LineMessage {
-  return textMessage(`หากปุ่มเปิดไม่ได้ ใช้ลิงก์นี้:\n${url}`);
 }
 
 export function createUnauthorizedMessage(): LineMessage {

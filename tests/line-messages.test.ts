@@ -39,7 +39,7 @@ describe("LINE messages", () => {
     const parsed = calendarActionSchema.parse(
       createCalendarReadyMessage("https://example.com/calendar.ics"),
     );
-    expect(parsed.template.actions[0].label).toBe("เพิ่มใน Calendar");
+    expect(parsed.template.actions[0].label).toBe("ดาวน์โหลดเดือนนี้");
   });
 
   it("places the roster review Flex message last", () => {

@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   confirm: vi.fn(),
   claim: vi.fn(),
+  saveMonth: vi.fn(),
+  feedToken: vi.fn(),
+  resetFeed: vi.fn(),
 }));
 const secret = "test-download-secret-at-least-32-characters";
 vi.mock("@/lib/env", () => ({
@@ -39,6 +42,13 @@ vi.mock("@/lib/storage/jobs", () => ({
   deleteRosterJob: vi.fn(),
   hashLineUserId: (id: string) => `hashed-${id}`,
 }));
+
+vi.mock("@/lib/storage/feed", () => ({
+  saveConfirmedMonth: mocks.saveMonth,
+  getOrCreateFeedToken: mocks.feedToken,
+  resetFeedToken: mocks.resetFeed,
+}));
+const FEED_TOKEN = "A".repeat(32);
 
 function request(event: Record<string, unknown>, validSignature = true) {
   const body = JSON.stringify({ events: [event] });
@@ -70,6 +80,8 @@ beforeEach(() => {
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 1800000).toISOString(),
   }));
+  mocks.feedToken.mockResolvedValue({ token: FEED_TOKEN, created: true });
+  mocks.resetFeed.mockResolvedValue("B".repeat(32));
   mocks.confirm.mockImplementation(async (job) => ({
     ...job,
     status: "confirmed",
@@ -122,15 +134,53 @@ describe("manual roster LINE flow", () => {
       }),
     );
     expect(mocks.confirm).toHaveBeenCalledOnce();
-    const url = new URL(
-      mocks.reply.mock.calls[1][1][0].template.actions[0].uri,
+    // The month is stored for the calendar link before replying.
+    expect(mocks.saveMonth).toHaveBeenCalledWith(
+      "hashed-allowed",
+      expect.objectContaining({ year: 2026, month: 10 }),
     );
+    const [feedMessage, downloadMessage] = mocks.reply.mock.calls[1][1];
+    expect(feedMessage.text).toContain(
+      `https://example.com/api/feed/${FEED_TOKEN}.ics`,
+    );
+    expect(feedMessage.text).toContain("ต.ค. 2026");
+    const url = new URL(downloadMessage.template.actions[0].uri);
     expect(url.pathname).toContain("NANCHAYA-2026-10.ics");
     expect(
       verifyDownloadToken(url.searchParams.get("token")!, job.id, secret).jobId,
     ).toBe(job.id);
     expect(mocks.analyze).not.toHaveBeenCalled();
     expect(mocks.download).not.toHaveBeenCalled();
+  });
+
+  it("tells an existing subscriber the month was added instead of resending the link", async () => {
+    mocks.feedToken.mockResolvedValue({ token: FEED_TOKEN, created: false });
+    await POST(request(textEvent()));
+    mocks.get.mockResolvedValue(await mocks.create.mock.results[0].value);
+    await POST(
+      request({
+        type: "postback",
+        webhookEventId: "event-2",
+        replyToken: "confirm-reply",
+        source: { userId: "allowed" },
+        postback: {
+          data: "action=confirm&job=c51e7f70-e4c9-4afb-a921-54c6c9ee41e2",
+        },
+      }),
+    );
+    const feedMessage = mocks.reply.mock.calls[1][1][0];
+    expect(feedMessage.text).toContain("ไม่ต้องทำอะไรเพิ่ม");
+    expect(feedMessage.text).not.toContain("/api/feed/");
+  });
+
+  it.each([
+    ["ลิงก์ปฏิทิน", FEED_TOKEN],
+    ["รีเซ็ต ลิงก์ปฏิทิน", "B".repeat(32)],
+  ])("answers the %s command with the calendar link", async (text, token) => {
+    await POST(request(textEvent(text)));
+    const reply = mocks.reply.mock.calls[0][1][0].text;
+    expect(reply).toContain(`https://example.com/api/feed/${token}.ics`);
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
   it("rejects an OFF mismatch without storing a confirmable job", async () => {

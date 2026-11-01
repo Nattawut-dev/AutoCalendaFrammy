@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { createCalendarDownloadUrl } from "@/lib/calendar/download-url";
+import { createFeedUrl } from "@/lib/calendar/feed-url";
 import { getEnv } from "@/lib/env";
 import {
   AppError,
@@ -16,7 +17,8 @@ import {
 import { createPreviewMessages } from "@/lib/line/flex";
 import {
   createCalendarReadyMessage,
-  createCalendarUrlFallback,
+  createFeedLinkMessage,
+  createFeedUpdatedMessage,
   createGeminiErrorMessage,
   createGenericAnalysisErrorMessage,
   createHelpMessage,
@@ -28,6 +30,12 @@ import {
 import { verifyLineSignature } from "@/lib/line/signature";
 import { validateRoster } from "@/lib/roster/validate";
 import { parseTextRoster } from "@/lib/roster/parse-text";
+import {
+  getOrCreateFeedToken,
+  resetFeedToken,
+  saveConfirmedMonth,
+} from "@/lib/storage/feed";
+import { formatThaiMonth } from "@/lib/utils/date";
 import {
   createDownloadToken,
   createUserBinding,
@@ -112,6 +120,27 @@ async function handleText(event: WebhookEvent, userId: string): Promise<void> {
   const normalized = message.text.trim().toLowerCase();
   if (["help", "ช่วยเหลือ", "วิธีใช้"].includes(normalized)) {
     await safeReply(event.replyToken, [createHelpMessage()]);
+    return;
+  }
+  const command = normalized.replace(/\s+/g, "");
+  if (command === "ลิงก์ปฏิทิน" || command === "ลิงค์ปฏิทิน") {
+    const { token } = await getOrCreateFeedToken(hashLineUserId(userId));
+    await safeReply(event.replyToken, [
+      createFeedLinkMessage(
+        createFeedUrl(getEnv().APP_BASE_URL, token),
+        "ลิงก์ปฏิทินของคุณ (อัปเดตเองทุกเดือน):",
+      ),
+    ]);
+    return;
+  }
+  if (command === "รีเซ็ตลิงก์ปฏิทิน" || command === "รีเซ็ตลิงค์ปฏิทิน") {
+    const token = await resetFeedToken(hashLineUserId(userId));
+    await safeReply(event.replyToken, [
+      createFeedLinkMessage(
+        createFeedUrl(getEnv().APP_BASE_URL, token),
+        "เปลี่ยนลิงก์ปฏิทินแล้ว ลิงก์เก่าใช้ไม่ได้ทันที ลบปฏิทินเก่าออกจากแอปแล้วเพิ่มลิงก์ใหม่นี้:",
+      ),
+    ]);
     return;
   }
   if (["ตาราง", "กะ", "roster"].includes(normalized)) {
@@ -201,6 +230,9 @@ async function handlePostback(
   const confirmed =
     job.status === "confirmed" ? job : await markRosterJobConfirmed(job);
   const env = getEnv();
+  await saveConfirmedMonth(userBinding, confirmed.roster);
+  const feed = await getOrCreateFeedToken(userBinding);
+  const monthLabel = `${formatThaiMonth(confirmed.roster.month)} ${confirmed.roster.year}`;
   const token = createDownloadToken(
     confirmed.id,
     createUserBinding(userId, env.DOWNLOAD_TOKEN_SECRET),
@@ -208,8 +240,13 @@ async function handlePostback(
   );
   const url = createCalendarDownloadUrl(env.APP_BASE_URL, confirmed, token);
   await safeReply(event.replyToken, [
+    feed.created
+      ? createFeedLinkMessage(
+          createFeedUrl(env.APP_BASE_URL, feed.token),
+          `บันทึกตาราง ${monthLabel} แล้ว ✅ นี่คือลิงก์ปฏิทินของคุณ เพิ่มครั้งเดียว ใช้ได้ทุกเดือน:`,
+        )
+      : createFeedUpdatedMessage(monthLabel),
     createCalendarReadyMessage(url),
-    createCalendarUrlFallback(url),
   ]);
 }
 
