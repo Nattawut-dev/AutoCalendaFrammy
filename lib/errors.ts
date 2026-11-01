@@ -51,6 +51,7 @@ export type GeminiFailureReason =
   | "model_not_found"
   | "rate_limited"
   | "service_unavailable"
+  | "timeout"
   | "unknown";
 export class RosterValidationError extends AppError {
   constructor(readonly issues: string[]) {

@@ -56,18 +56,9 @@ describe("Gemini 503 recovery", () => {
     await vi.runAllTimersAsync();
     await assertion;
 
-    expect(
-      generateContent.mock.calls.map(([request]) => request.model),
-    ).toEqual([
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
-    ]);
+    const models = generateContent.mock.calls.map(([request]) => request.model);
+    expect(models.filter((m) => m === "gemini-3.8-flash")).toHaveLength(6);
+    expect(models.filter((m) => m === "gemini-3.6-flash")).toHaveLength(2);
   });
 
   it("does not switch models for a bad request", async () => {
@@ -79,7 +70,8 @@ describe("Gemini 503 recovery", () => {
     await expect(
       analyzeRosterImage(new Uint8Array([1]), "image/jpeg"),
     ).rejects.toMatchObject({ reason: "invalid_request", status: 400 });
-    expect(generateContent).toHaveBeenCalledTimes(1);
+    // Analysis and audit start together; neither retries a 400.
+    expect(generateContent).toHaveBeenCalledTimes(2);
   });
 
   it("does not make a mismatched fallback audit confirmable", async () => {
@@ -127,13 +119,58 @@ describe("Gemini 503 recovery", () => {
       reason: "service_unavailable",
       status: 503,
     });
+    const models = generateContent.mock.calls.map(([request]) => request.model);
+    expect(models.slice(-1)).toEqual(["gemini-3.6-flash"]);
     expect(
-      generateContent.mock.calls.map(([request]) => request.model),
-    ).toEqual([
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
+      models.filter((m) => m === "gemini-3.6-flash").length,
+    ).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("Gemini time budget", () => {
+  it("stops retrying before Vercel's 60s limit and reports a timeout", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const started = Date.now();
+    generateContent.mockImplementation(
+      ({ config }: { config: { abortSignal: AbortSignal } }) =>
+        // Each slow 503 burns most of the budget; abort ends it like the SDK.
+        new Promise((_, reject) => {
+          const timer = setTimeout(
+            () => reject(new ApiError({ status: 503, message: "UNAVAILABLE" })),
+            30_000,
+          );
+          config.abortSignal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(new DOMException("aborted", "TimeoutError"));
+          });
+        }),
+    );
+
+    const failure = analyzeRosterImage(new Uint8Array([1]), "image/jpeg").catch(
+      (error: unknown) => error,
+    );
+    await vi.runAllTimersAsync();
+
+    expect(await failure).toMatchObject({ reason: "timeout" });
+    expect(Date.now() - started).toBeLessThan(55_000);
+  });
+
+  it("passes an abort signal and runs the audit with low thinking", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    generateContent.mockImplementation(async ({ contents }) => {
+      const isAudit = contents[0].parts[0].text.includes("independent");
+      return { text: JSON.stringify(isAudit ? audit : sampleRoster) };
+    });
+    await analyzeRosterImage(new Uint8Array([1]), "image/jpeg");
+    const configs = generateContent.mock.calls.map(([r]) => r.config);
+    expect(configs.every((c) => c.abortSignal instanceof AbortSignal)).toBe(
+      true,
+    );
+    expect(configs.map((c) => c.thinkingConfig.thinkingLevel).sort()).toEqual([
+      "LOW",
+      "MEDIUM",
     ]);
   });
 });

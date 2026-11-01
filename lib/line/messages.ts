@@ -82,6 +82,11 @@ export function createGeminiErrorMessage(
       "บริการวิเคราะห์รูปไม่พร้อมใช้งานชั่วคราว พิมพ์ ‘ตาราง’ เพื่อสร้าง Calendar จากรหัสกะเป็นข้อความได้",
     );
   }
+  if (reason === "timeout") {
+    return textMessage(
+      "วิเคราะห์รูปนานเกินเวลาที่กำหนด กรุณาส่งภาพใหม่อีกครั้ง หรือพิมพ์ ‘ตาราง’ เพื่อสร้าง Calendar จากข้อความ",
+    );
+  }
   if (reason === "invalid_request") {
     return textMessage(
       "Gemini ไม่รับคำขอวิเคราะห์นี้ กรุณาตรวจชื่อโมเดล แล้วลองส่งภาพ JPEG หรือ PNG ที่มีขนาดเล็กลง",
