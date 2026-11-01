@@ -2,7 +2,10 @@ import { ApiError } from "@google/genai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { analyzeRosterImage } from "@/lib/gemini/analyze-roster";
 import { validateRoster } from "@/lib/roster/validate";
-import { sampleRoster } from "@/tests/fixtures/sample-roster";
+import {
+  sampleCompactRoster,
+  sampleRoster,
+} from "@/tests/fixtures/sample-roster";
 
 const { generateContent } = vi.hoisted(() => ({
   generateContent: vi.fn(),
@@ -36,16 +39,17 @@ afterEach(() => {
 });
 
 describe("Gemini 503 recovery", () => {
-  it("uses the previous stable model after persistent 503 and still audits the roster", async () => {
+  it("falls back to the previous model for the audit only, after persistent 503", async () => {
     vi.useFakeTimers();
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     generateContent.mockImplementation(async ({ model, contents }) => {
-      if (model === "gemini-3.8-flash") {
+      const isAudit = contents[0].parts[0].text.includes("independent");
+      if (isAudit && model === "gemini-3.8-flash") {
         throw new ApiError({ status: 503, message: "UNAVAILABLE" });
       }
-      const isAudit = contents[0].parts[0].text.includes("independent");
-      return { text: JSON.stringify(isAudit ? audit : sampleRoster) };
+      return { text: JSON.stringify(isAudit ? audit : sampleCompactRoster) };
     });
 
     const result = analyzeRosterImage(new Uint8Array([1, 2, 3]), "image/jpeg");
@@ -57,8 +61,37 @@ describe("Gemini 503 recovery", () => {
     await assertion;
 
     const models = generateContent.mock.calls.map(([request]) => request.model);
-    expect(models.filter((m) => m === "gemini-3.8-flash")).toHaveLength(6);
-    expect(models.filter((m) => m === "gemini-3.6-flash")).toHaveLength(2);
+    // 1 analysis + 3 audit attempts on 3.8, then 1 audit on 3.6.
+    expect(models.filter((m) => m === "gemini-3.8-flash")).toHaveLength(4);
+    expect(models.filter((m) => m === "gemini-3.6-flash")).toHaveLength(1);
+  });
+
+  it("never reads colors with the fallback model: analysis 503 is reported", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    generateContent.mockImplementation(async ({ model, contents }) => {
+      const isAudit = contents[0].parts[0].text.includes("independent");
+      if (!isAudit && model === "gemini-3.8-flash") {
+        throw new ApiError({ status: 503, message: "UNAVAILABLE" });
+      }
+      return { text: JSON.stringify(isAudit ? audit : sampleCompactRoster) };
+    });
+
+    const failure = analyzeRosterImage(new Uint8Array([1]), "image/jpeg").catch(
+      (error: unknown) => error,
+    );
+    await vi.runAllTimersAsync();
+
+    expect(await failure).toMatchObject({
+      reason: "service_unavailable",
+      status: 503,
+    });
+    const analysisModels = generateContent.mock.calls
+      .filter(([r]) => !r.contents[0].parts[0].text.includes("independent"))
+      .map(([r]) => r.model);
+    expect(analysisModels).not.toContain("gemini-3.6-flash");
   });
 
   it("does not switch models for a bad request", async () => {
@@ -79,11 +112,11 @@ describe("Gemini 503 recovery", () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});
     generateContent.mockImplementation(async ({ model, contents }) => {
-      if (model === "gemini-3.8-flash") {
+      const isAudit = contents[0].parts[0].text.includes("independent");
+      if (isAudit && model === "gemini-3.8-flash") {
         throw new ApiError({ status: 503, message: "UNAVAILABLE" });
       }
-      const isAudit = contents[0].parts[0].text.includes("independent");
-      if (!isAudit) return { text: JSON.stringify(sampleRoster) };
+      if (!isAudit) return { text: JSON.stringify(sampleCompactRoster) };
       const mismatchedAudit = structuredClone(audit);
       mismatchedAudit.cells[0].code = "K9";
       return { text: JSON.stringify(mismatchedAudit) };
@@ -119,11 +152,14 @@ describe("Gemini 503 recovery", () => {
       reason: "service_unavailable",
       status: 503,
     });
-    const models = generateContent.mock.calls.map(([request]) => request.model);
-    expect(models.slice(-1)).toEqual(["gemini-3.6-flash"]);
-    expect(
-      models.filter((m) => m === "gemini-3.6-flash").length,
-    ).toBeLessThanOrEqual(2);
+    const fallbackStages = generateContent.mock.calls
+      .filter(([r]) => r.model === "gemini-3.6-flash")
+      .map(([r]) =>
+        r.contents[0].parts[0].text.includes("independent")
+          ? "audit"
+          : "analysis",
+      );
+    expect(fallbackStages).not.toContain("analysis");
   });
 });
 
@@ -157,20 +193,20 @@ describe("Gemini time budget", () => {
     expect(Date.now() - started).toBeLessThan(55_000);
   });
 
-  it("passes an abort signal and runs the audit with low thinking", async () => {
+  it("passes an abort signal and uses low thinking for both requests", async () => {
     vi.spyOn(console, "info").mockImplementation(() => {});
     generateContent.mockImplementation(async ({ contents }) => {
       const isAudit = contents[0].parts[0].text.includes("independent");
-      return { text: JSON.stringify(isAudit ? audit : sampleRoster) };
+      return { text: JSON.stringify(isAudit ? audit : sampleCompactRoster) };
     });
     await analyzeRosterImage(new Uint8Array([1]), "image/jpeg");
     const configs = generateContent.mock.calls.map(([r]) => r.config);
     expect(configs.every((c) => c.abortSignal instanceof AbortSignal)).toBe(
       true,
     );
-    expect(configs.map((c) => c.thinkingConfig.thinkingLevel).sort()).toEqual([
+    expect(configs.map((c) => c.thinkingConfig.thinkingLevel)).toEqual([
       "LOW",
-      "MEDIUM",
+      "LOW",
     ]);
   });
 });

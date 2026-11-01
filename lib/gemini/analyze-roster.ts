@@ -16,6 +16,7 @@ import {
   ROSTER_RESPONSE_SCHEMA,
 } from "@/lib/gemini/prompt";
 import { applyIndependentAudit } from "@/lib/roster/audit";
+import { expandCompactRoster } from "@/lib/roster/expand-compact";
 import { normalizeRoster } from "@/lib/roster/normalize";
 import { rosterAuditSchema } from "@/lib/schemas";
 import type { RosterAnalysis } from "@/lib/types";
@@ -80,7 +81,7 @@ export function classifyGeminiFailure(error: unknown): GeminiFailure {
 export function createVisionConfig(
   model: string,
   responseSchema: Schema,
-  thinkingLevel: ThinkingLevel = ThinkingLevel.MEDIUM,
+  thinkingLevel: ThinkingLevel = ThinkingLevel.LOW,
 ) {
   const isGemini3 = /^gemini-3(?:\.|$)/.test(model);
   return {
@@ -131,23 +132,66 @@ async function withRetry<T>(
   throw lastError;
 }
 
+type Stage = "analysis" | "audit";
+
+type UsageLike = {
+  promptTokenCount?: number;
+  thoughtsTokenCount?: number;
+  candidatesTokenCount?: number;
+};
+
+const usageFields = (usage: UsageLike | undefined) => ({
+  promptTokens: usage?.promptTokenCount,
+  thoughtsTokens: usage?.thoughtsTokenCount,
+  outputTokens: usage?.candidatesTokenCount,
+});
+
 export async function analyzeRosterImage(
   image: Uint8Array,
   mimeType: "image/jpeg" | "image/png",
 ): Promise<RosterAnalysis> {
   const model = getEnv().GEMINI_MODEL;
-  const deadline = Date.now() + GEMINI_TIME_BUDGET_MS;
+  const startedAt = Date.now();
+  const deadline = startedAt + GEMINI_TIME_BUDGET_MS;
   const cancel = new AbortController();
-  let activeModel = model;
-  let activeStage: "analysis" | "audit" = "analysis";
+  // Both stages run at once, so each keeps its own model/timing for the logs.
+  const stageModel: Record<Stage, string> = { analysis: model, audit: model };
+  let failedStage: Stage | undefined;
   try {
     const imageData = Buffer.from(image).toString("base64");
     const client = getGeminiClient();
     const makeImagePart = () => ({
       inlineData: { mimeType, data: imageData },
     });
+    const callModel = (
+      stage: Stage,
+      targetModel: string,
+      contents: unknown[],
+      schema: Schema,
+      thinkingLevel: ThinkingLevel,
+      attempts: { count: number },
+      maxAttempts?: number,
+    ) => {
+      stageModel[stage] = targetModel;
+      return withRetry(
+        (abortSignal) => {
+          attempts.count += 1;
+          return client.models.generateContent({
+            model: targetModel,
+            contents: contents as never,
+            config: {
+              ...createVisionConfig(targetModel, schema, thinkingLevel),
+              abortSignal,
+            },
+          });
+        },
+        deadline,
+        cancel.signal,
+        maxAttempts,
+      );
+    };
     const generateRosterContent = async (
-      stage: "analysis" | "audit",
+      stage: Stage,
       prompt: string,
       schema: Schema,
       thinkingLevel: ThinkingLevel,
@@ -158,98 +202,123 @@ export async function analyzeRosterImage(
           parts: [{ text: prompt }, makeImagePart()],
         },
       ];
-      activeStage = stage;
-      activeModel = model;
-      try {
-        const response = await withRetry(
-          (abortSignal) =>
-            client.models.generateContent({
-              model,
-              contents,
-              config: {
-                ...createVisionConfig(model, schema, thinkingLevel),
-                abortSignal,
-              },
-            }),
-          deadline,
-          cancel.signal,
-        );
-        return { response, modelUsed: model };
-      } catch (error) {
-        // Preserve the chosen model for all normal requests. Only a persistent
-        // 503 on the new default model is eligible for the previous stable model.
-        if (
-          model !== "gemini-3.8-flash" ||
-          classifyGeminiFailure(error).status !== 503
-        ) {
-          throw error;
-        }
-        const fallbackModel = "gemini-3.6-flash";
-        activeModel = fallbackModel;
-        console.warn(
+      const stageStart = Date.now();
+      const attempts = { count: 0 };
+      const logStage = (fields: Record<string, unknown>) =>
+        console.info(
           JSON.stringify({
-            level: "warn",
-            operation: "gemini_roster_fallback",
+            level: "info",
+            operation: "gemini_roster_stage",
             stage,
-            fromModel: model,
-            toModel: fallbackModel,
-            status: 503,
+            model: stageModel[stage],
+            thinkingLevel,
+            attempts: attempts.count,
+            elapsedMs: Date.now() - stageStart,
+            ...fields,
           }),
         );
+      const run = async () => {
         try {
-          const response = await withRetry(
-            (abortSignal) =>
-              client.models.generateContent({
-                model: fallbackModel,
-                contents,
-                config: {
-                  ...createVisionConfig(fallbackModel, schema, thinkingLevel),
-                  abortSignal,
-                },
-              }),
-            deadline,
-            cancel.signal,
-            2,
+          return await callModel(
+            stage,
+            model,
+            contents,
+            schema,
+            thinkingLevel,
+            attempts,
           );
-          return { response, modelUsed: fallbackModel };
-        } catch (fallbackError) {
-          const failure = classifyGeminiFailure(fallbackError);
+        } catch (error) {
+          // Only the audit (codes only) may fall back after a persistent 503.
+          // Measured on the Nov 2026 roster, gemini-3.6-flash reads codes
+          // correctly but misreads cell colors, which would silently change
+          // OT times, so the analysis never falls back.
+          if (
+            stage !== "audit" ||
+            model !== "gemini-3.8-flash" ||
+            classifyGeminiFailure(error).status !== 503
+          ) {
+            throw error;
+          }
+          const fallbackModel = "gemini-3.6-flash";
           console.warn(
             JSON.stringify({
               level: "warn",
               operation: "gemini_roster_fallback",
               stage,
-              result: "failed",
+              fromModel: model,
               toModel: fallbackModel,
-              category: failure.reason,
-              ...(failure.status === undefined
-                ? {}
-                : { status: failure.status }),
+              status: 503,
             }),
           );
-          throw error;
+          try {
+            return await callModel(
+              stage,
+              fallbackModel,
+              contents,
+              schema,
+              thinkingLevel,
+              attempts,
+              2,
+            );
+          } catch (fallbackError) {
+            const failure = classifyGeminiFailure(fallbackError);
+            console.warn(
+              JSON.stringify({
+                level: "warn",
+                operation: "gemini_roster_fallback",
+                stage,
+                result: "failed",
+                toModel: fallbackModel,
+                category: failure.reason,
+                ...(failure.status === undefined
+                  ? {}
+                  : { status: failure.status }),
+              }),
+            );
+            throw error;
+          }
         }
+      };
+      try {
+        const response = await run();
+        logStage({
+          result: "ok",
+          ...usageFields(response.usageMetadata),
+          finishReason: response.candidates?.[0]?.finishReason,
+        });
+        return { response, modelUsed: stageModel[stage] };
+      } catch (error) {
+        logStage({
+          result: cancel.signal.aborted && failedStage ? "cancelled" : "failed",
+          category: classifyGeminiFailure(error).reason,
+        });
+        throw error;
       }
     };
 
-    // Run both at once so the pair fits Vercel's 60s limit; 503s are retried
+    // Run both at once so the pair fits Vercel's limit; 503s are retried
     // within the budget. If one fails, stop the other.
-    const stopOnFailure = <T>(promise: Promise<T>) =>
+    const stopOnFailure = <T>(stage: Stage, promise: Promise<T>) =>
       promise.catch((error: unknown) => {
+        failedStage ??= stage;
         cancel.abort();
         throw error;
       });
     const [analysis, auditResult] = await Promise.all([
       stopOnFailure(
+        "analysis",
         generateRosterContent(
           "analysis",
           ROSTER_ANALYSIS_PROMPT,
           ROSTER_RESPONSE_SCHEMA,
-          ThinkingLevel.MEDIUM,
+          // Measured on the Nov 2026 roster: LOW was as accurate as MEDIUM
+          // with ~12k fewer thinking tokens.
+          ThinkingLevel.LOW,
         ),
       ),
       // The audit only transcribes one row, so it needs little reasoning.
       stopOnFailure(
+        "audit",
         generateRosterContent(
           "audit",
           ROSTER_AUDIT_PROMPT,
@@ -262,7 +331,9 @@ export async function analyzeRosterImage(
     if (!analysis.response.text || !auditResult.response.text) {
       throw new Error("empty model response");
     }
-    const roster = normalizeRoster(JSON.parse(analysis.response.text));
+    const roster = normalizeRoster(
+      expandCompactRoster(JSON.parse(analysis.response.text)),
+    );
     const audit = rosterAuditSchema.parse(
       JSON.parse(auditResult.response.text),
     );
@@ -279,6 +350,7 @@ export async function analyzeRosterImage(
         model,
         analysisModel: analysis.modelUsed,
         auditModel: auditResult.modelUsed,
+        elapsedMs: Date.now() - startedAt,
       }),
     );
     return auditedRoster;
@@ -290,8 +362,9 @@ export async function analyzeRosterImage(
         operation: "gemini_roster_analysis",
         category: failure.reason,
         model,
-        activeModel,
-        stage: activeStage,
+        stage: failedStage ?? "parse",
+        activeModel: failedStage ? stageModel[failedStage] : model,
+        elapsedMs: Date.now() - startedAt,
         mimeType,
         imageBytes: image.byteLength,
         ...(failure.status === undefined ? {} : { status: failure.status }),

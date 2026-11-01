@@ -15,12 +15,12 @@ describe("Gemini model configuration", () => {
     expect(DEFAULT_GEMINI_MODEL).toBe("gemini-3.8-flash");
   });
 
-  it("uses high-resolution vision and medium thinking for Gemini 3", () => {
+  it("uses high-resolution vision and low thinking for Gemini 3", () => {
     expect(
       createVisionConfig("gemini-3.6-flash", ROSTER_RESPONSE_SCHEMA),
     ).toMatchObject({
       mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
     });
   });
 
@@ -30,8 +30,9 @@ describe("Gemini model configuration", () => {
     ).not.toHaveProperty("mediaResolution");
   });
 
-  it("gives the model the H8 reference time when no legend is visible", () => {
-    expect(ROSTER_ANALYSIS_PROMPT).toContain("H8: 08:00 - 17:00");
+  it("asks the model to copy the printed legend instead of calculating times", () => {
+    expect(ROSTER_ANALYSIS_PROMPT).toContain("legend.shiftTimes");
+    expect(ROSTER_ANALYSIS_PROMPT).toContain("do not calculate");
   });
 
   it.each([

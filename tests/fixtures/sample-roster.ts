@@ -83,3 +83,42 @@ export const sampleRoster: RosterAnalysis = {
 export function cloneSampleRoster(): RosterAnalysis {
   return structuredClone(sampleRoster);
 }
+
+/** The same July roster in the short form Gemini now returns. */
+export const sampleCompactRoster = {
+  month: sampleRoster.month,
+  year: sampleRoster.year,
+  printedOffCount: sampleRoster.printedOffCount,
+  legend: { shiftTimes: [], otTime: null },
+  weekdays: sampleRoster.shifts.map((s) => s.printedWeekday).join(" "),
+  rows: [
+    {
+      name: "MINTRA",
+      cells: sampleRoster.shifts
+        .map((_, i) => (i === 0 ? "L8" : "OFF"))
+        .join(" "),
+    },
+    {
+      name: "SUNISA",
+      cells: sampleRoster.shifts
+        .map((_, i) => (i === 0 ? "L8" : "VAC"))
+        .join(" "),
+    },
+    {
+      name: "NANCHAYA",
+      cells: sampleRoster.shifts.map((s) => s.code).join(" "),
+    },
+  ],
+  coloredDays: [],
+  uncertainDays: [],
+  specialEvents: sampleRoster.specialEvents.map(
+    ({ date, title, start, end, rawRemarkText }) => ({
+      date,
+      title,
+      start,
+      end,
+      rawRemarkText,
+    }),
+  ),
+  warnings: [],
+};

@@ -5,94 +5,68 @@ import { ROSTER_STATUSES } from "@/lib/roster/status";
 
 const WEEKDAY_ENUM = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
+/**
+ * The model only transcribes what is printed. Dates, times, coworkers and OT
+ * hours are derived in code (lib/roster/expand-compact.ts), which keeps the
+ * answer short enough to finish well within Vercel's time limit.
+ */
 export const ROSTER_ANALYSIS_PROMPT = `
-Analyze this employee roster image by inspecting its visual table structure, not only OCR text.
+Transcribe this employee roster image. Copy what is printed; do not calculate anything.
 
-Mandatory rules:
-- Locate the employee row whose name is exactly NANCHAYA.
+Rules:
 - Read the roster month and year from the title.
-- First pass — shift text only: ignore all cell background colors. Match every numbered date column and its printed weekday header to the corresponding NANCHAYA cell, then read the printed code in each cell from left to right.
-- Shift time definitions:
-  - If a DETAILS or legend table is visible in the image, read the shift-code start/end definitions from it and return each one in legend.shiftTimes (e.g. "H9 : 08.00-18.00" -> { code: "H9", start: "08:00", end: "18:00" }). The printed legend always wins over the standard list below.
-  - If the legend prints OT hours (e.g. a color key "OT 09.00-11.00"), return them in legend.otTime; otherwise legend.otTime is null.
-  - If no DETAILS or legend table is present in the image (e.g. cropped roster grid), use these standard shift definitions:
-    * F9: 06:00 - 16:00
-    * HH9: 08:30 - 18:30
-    * JJ9: 10:30 - 20:30
-    * H8: 08:00 - 17:00
-    * H9: 08:00 - 18:00
-    * K9: 11:00 - 21:00
-    * M7: 13:00 - 21:00
-    * L8: 12:00 - 21:00
-    * I8: 09:00 - 18:00
-- Read the printed OFF total at the far right of the NANCHAYA row into printedOffCount. Never use another employee's OFF total. Use null only if this total is absent or genuinely unreadable.
-- Count the extracted OFF cells and compare that count with printedOffCount. If they differ, re-check date alignment and every NANCHAYA cell before returning. Never change a clear cell merely to force the count to match. If the mismatch cannot be resolved from the image, preserve the visually supported codes, lower confidence only on ambiguous cells, and add a warning with code off_count_mismatch.
-- Extract the printed shift code and its start/end time. Status color is separate metadata and must never change, replace, or override the shift code, OFF value, or its time.
-- Second pass — status color: inspect the background color and text markers of each already-read NANCHAYA cell. Even if no legend is printed in the image, map cell colors and markers according to these standard definitions:
-  * Cyan / Turquoise: SWITCH_SHIFT (SWITCH SHIFT)
-  * Orange: CHANGE_DAY_OFF (CHANGE DAY OFF)
-  * Light Yellow / Pale Yellow / Cream: DAY_OFF_REQUEST (DAY OFF REQUEST)
-  * Magenta / Fuchsia, or the color the visible legend labels OT: OT (OT). If legend.otTime is printed, extend that shift's start/end to include the OT hours (e.g. K9 11:00-21:00 + OT 09:00-11:00 = 09:00-21:00). Keep the printed shift code.
-  * Red: VACATION (VACATION)
-  * Olive / Mustard / Yellow-green or text contains "BL": BUSINESS_LEAVE (BUSINESS LEAVE)
-  * Slate Blue / Medium Blue or text contains "OT DAYOFF": OT_DAYOFF (OT DAYOFF)
-  * Light Pink / Peach or text contains "SL": SICK_LEAVE (SICK LEAVE)
-  * Light Green / Lime: SHIFT_CHANGE (SHIFT CHANGE)
-  * Plain white / uncolored: NORMAL
-- If a color legend is visible in the image, compare against both the visible legend and the standard definitions above.
-- Use NORMAL when the cell has no colored status or the color cannot be distinguished reliably. Never infer a status from the shift code alone.
-- statusConfidence measures only the cell-background-to-legend match. If the status color is ambiguous, use NORMAL, lower statusConfidence, and add a warning with code status_color_uncertain. This uncertainty must not reduce the shift-code confidence when the printed code itself is clear.
-- Coworkers on duty:
-  - For each date column where NANCHAYA is working (not OFF): inspect all other employee rows in the table (e.g. MINTRA, SUNISA, JANTARAS). Extract every colleague who is also working on that same date (exclude colleagues whose code is OFF, leave, or absent) into the coworkers array ({ name: "EMPLOYEE_NAME", code: "SHIFT_CODE" }). Normalize employee names to clean uppercase.
-  - If NANCHAYA is OFF on that date or no other colleagues are working, return an empty array [] for coworkers.
-- Read only REMARK entries that explicitly include NANCHAYA.
-- Use REMARK entries as the authority for anything unusual in NANCHAYA's row: if a remark explains a cell (e.g. "NANCHAYA : OT ON DAYOFF 30NOV26", leave, shift swap), use it to confirm that cell's status. A remark with no printed start/end time is never a specialEvent; do not invent times for it. If a remark conflicts with the cell or color, keep the visible cell and add a warning with code remark_conflict.
-- OFF means a day off. Use code OFF, isDayOff true, and null start/end.
-- Do not invent blurry, cropped, unreadable, or missing values. Record uncertainty in warnings.
-- Preserve each printed shift code after trimming whitespace and normalizing letter case.
-- Training, meetings, supervision, and other applicable remarks are separate specialEvents.
-- Training may intentionally overlap a work shift. Keep both records and never shorten, remove, merge, or alter the work shift.
-- Return exactly one shift record for every calendar date in the displayed month.
-- printedWeekday is the weekday abbreviation visibly printed above that exact date column. Do not calculate or invent it.
-- Use YYYY-MM-DD dates and HH:mm 24-hour local times in Asia/Bangkok.
-- Assign confidence from 0 to 1 to every shift and special event.
-- rawRemarkText must contain the source remark that explicitly names NANCHAYA.
-- Return JSON only, matching the supplied schema exactly. Do not return prose or Markdown.
+- weekdays: one string with the weekday abbreviation printed above each numbered date column, day 1 to the last day, separated by single spaces (e.g. "SUN MON TUE ...").
+- rows: every employee row in the table (e.g. MINTRA, SUNISA, JANTARAS, NANCHAYA). name is the printed name in uppercase. cells is one string with exactly one uppercase token per date column, left to right, separated by single spaces (e.g. "F9 K9 OFF VAC ..."). A token never contains a space. If one merged cell spans several dates (e.g. "MATERNITY LEAVE"), write LEAVE for each date it covers. Never skip, merge or shift columns.
+- printedOffCount: the OFF total printed at the far right of the NANCHAYA row only. null if absent or unreadable.
+- legend.shiftTimes: every shift definition printed in the DETAILS/legend box, e.g. "H9 : 08.00-18.00" -> { code: "H9", start: "08:00", end: "18:00" }. Empty array if there is no such box.
+- legend.otTime: OT hours printed in the color key (e.g. "OT 09.00-11.00" -> { start: "09:00", end: "11:00" }), otherwise null.
+- coloredDays: only the NANCHAYA cells that have a background color, as { day, status }, matched to the printed color key. Leave out white / uncolored cells:
+  * Cyan / Turquoise: SWITCH_SHIFT
+  * Orange: CHANGE_DAY_OFF
+  * Light Yellow / Pale Yellow / Cream: DAY_OFF_REQUEST
+  * The color the key labels OT (often pink / magenta): OT
+  * Red: VACATION
+  * Olive / Mustard or text "BL": BUSINESS_LEAVE
+  * The color the key labels OT DAYOFF (often light / slate blue): OT_DAYOFF
+  * The color the key labels SL (often peach): SICK_LEAVE
+  * Light Green / Lime: SHIFT_CHANGE
+  Only the cell background (fill) counts. Text/font color is never a status: OFF is often printed in red text on a white cell, and that cell is uncolored.
+  Compare against the printed key first. If a color cannot be told apart reliably, leave the day out and list it in uncertainDays.
+- uncertainDays: day numbers whose NANCHAYA code or color is blurry, cropped or ambiguous. Empty array when everything is clear.
+- REMARK lines: use those naming NANCHAYA to confirm unusual NANCHAYA cells (e.g. "NANCHAYA : OT ON DAYOFF 30NOV26"). Only a remark that names NANCHAYA and prints a start and end time becomes a specialEvents item (date YYYY-MM-DD, HH:mm times, rawRemarkText = the remark text). Never invent times. A remark without times is normal and is not a conflict. Only when a remark clearly contradicts a NANCHAYA cell or color (e.g. it says OT ON DAYOFF on a date whose cell is OFF), keep the cell and add a warning with code remark_conflict.
+- Do not invent blurry, cropped or missing values; record them in warnings.
+- Return JSON only, matching the schema.
 `;
 
 export const ROSTER_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   required: [
-    "employee",
     "month",
     "year",
-    "timezone",
     "printedOffCount",
     "legend",
-    "shifts",
+    "weekdays",
+    "rows",
+    "coloredDays",
+    "uncertainDays",
     "specialEvents",
     "warnings",
   ],
   propertyOrdering: [
-    "employee",
     "month",
     "year",
-    "timezone",
     "printedOffCount",
     "legend",
-    "shifts",
+    "weekdays",
+    "rows",
+    "coloredDays",
+    "uncertainDays",
     "specialEvents",
     "warnings",
   ],
   properties: {
-    employee: { type: Type.STRING, format: "enum", enum: ["NANCHAYA"] },
     month: { type: Type.INTEGER },
     year: { type: Type.INTEGER },
-    timezone: {
-      type: Type.STRING,
-      format: "enum",
-      enum: ["Asia/Bangkok"],
-    },
     printedOffCount: { type: Type.INTEGER, nullable: true },
     legend: {
       type: Type.OBJECT,
@@ -121,86 +95,44 @@ export const ROSTER_RESPONSE_SCHEMA = {
         },
       },
     },
-    shifts: {
+    weekdays: { type: Type.STRING },
+    rows: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
-        required: [
-          "date",
-          "printedWeekday",
-          "code",
-          "start",
-          "end",
-          "isDayOff",
-          "source",
-          "confidence",
-          "status",
-          "statusConfidence",
-          "rawCellText",
-          "coworkers",
-        ],
+        required: ["name", "cells"],
         properties: {
-          date: { type: Type.STRING },
-          printedWeekday: {
-            type: Type.STRING,
-            format: "enum",
-            enum: WEEKDAY_ENUM,
-          },
-          code: { type: Type.STRING },
-          start: { type: Type.STRING, nullable: true },
-          end: { type: Type.STRING, nullable: true },
-          isDayOff: { type: Type.BOOLEAN },
-          source: {
-            type: Type.STRING,
-            format: "enum",
-            enum: ["roster"],
-          },
-          confidence: { type: Type.NUMBER },
+          name: { type: Type.STRING },
+          cells: { type: Type.STRING },
+        },
+      },
+    },
+    coloredDays: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        required: ["day", "status"],
+        properties: {
+          day: { type: Type.INTEGER },
           status: {
             type: Type.STRING,
             format: "enum",
-            enum: [...ROSTER_STATUSES],
-          },
-          statusConfidence: { type: Type.NUMBER },
-          rawCellText: { type: Type.STRING, nullable: true },
-          coworkers: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              required: ["name", "code"],
-              properties: {
-                name: { type: Type.STRING },
-                code: { type: Type.STRING },
-              },
-            },
+            enum: ROSTER_STATUSES.filter((s) => s !== "NORMAL"),
           },
         },
       },
     },
+    uncertainDays: { type: Type.ARRAY, items: { type: Type.INTEGER } },
     specialEvents: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
-        required: [
-          "date",
-          "title",
-          "start",
-          "end",
-          "source",
-          "confidence",
-          "rawRemarkText",
-        ],
+        required: ["date", "title", "start", "end", "rawRemarkText"],
         properties: {
           date: { type: Type.STRING },
           title: { type: Type.STRING },
           start: { type: Type.STRING },
           end: { type: Type.STRING },
-          source: {
-            type: Type.STRING,
-            format: "enum",
-            enum: ["remark"],
-          },
-          confidence: { type: Type.NUMBER },
           rawRemarkText: { type: Type.STRING },
         },
       },

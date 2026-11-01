@@ -107,3 +107,52 @@ export const rosterAuditSchema = z.object({
     .min(1)
     .max(31),
 });
+
+/** Short transcription returned by Gemini; expanded into a roster in code. */
+export const compactRosterSchema = z.object({
+  month: z.number().int().min(1).max(12),
+  year: z.number().int().min(2020).max(2100),
+  printedOffCount: z.number().int().min(0).max(31).nullable(),
+  legend: rosterLegendSchema,
+  weekdays: z
+    .string()
+    .max(200)
+    .transform((value) => value.trim().toUpperCase().split(/\s+/))
+    .pipe(z.array(printedWeekdaySchema).max(31)),
+  rows: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(50),
+        cells: z
+          .string()
+          .max(400)
+          .transform((value) => value.trim().split(/\s+/).filter(Boolean))
+          .pipe(z.array(z.string().max(40)).max(31)),
+      }),
+    )
+    .min(1)
+    .max(30),
+  coloredDays: z
+    .array(
+      z.object({
+        day: z.number().int().min(1).max(31),
+        status: z.enum(ROSTER_STATUSES),
+      }),
+    )
+    .max(31)
+    .default([]),
+  uncertainDays: z.array(z.number().int()).max(31).default([]),
+  specialEvents: z
+    .array(
+      z.object({
+        date: z.string().regex(isoDate),
+        title: z.string().min(1).max(160),
+        start: z.string().regex(localTime),
+        end: z.string().regex(localTime),
+        rawRemarkText: z.string().min(1).max(1000),
+      }),
+    )
+    .max(100)
+    .default([]),
+  warnings: z.array(rosterWarningSchema).max(100).default([]),
+});
