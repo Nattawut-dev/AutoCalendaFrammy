@@ -13,12 +13,14 @@ Mandatory rules:
 - Read the roster month and year from the title.
 - First pass — shift text only: ignore all cell background colors. Match every numbered date column and its printed weekday header to the corresponding NANCHAYA cell, then read the printed code in each cell from left to right.
 - Shift time definitions:
-  - If a DETAILS or legend table is visible in the image, read the shift-code start/end definitions from it.
+  - If a DETAILS or legend table is visible in the image, read the shift-code start/end definitions from it and return each one in legend.shiftTimes (e.g. "H9 : 08.00-18.00" -> { code: "H9", start: "08:00", end: "18:00" }). The printed legend always wins over the standard list below.
+  - If the legend prints OT hours (e.g. a color key "OT 09.00-11.00"), return them in legend.otTime; otherwise legend.otTime is null.
   - If no DETAILS or legend table is present in the image (e.g. cropped roster grid), use these standard shift definitions:
     * F9: 06:00 - 16:00
     * HH9: 08:30 - 18:30
     * JJ9: 10:30 - 20:30
     * H8: 08:00 - 17:00
+    * H9: 08:00 - 18:00
     * K9: 11:00 - 21:00
     * M7: 13:00 - 21:00
     * L8: 12:00 - 21:00
@@ -30,7 +32,7 @@ Mandatory rules:
   * Cyan / Turquoise: SWITCH_SHIFT (SWITCH SHIFT)
   * Orange: CHANGE_DAY_OFF (CHANGE DAY OFF)
   * Light Yellow / Pale Yellow / Cream: DAY_OFF_REQUEST (DAY OFF REQUEST)
-  * Magenta / Fuchsia: OT (OT)
+  * Magenta / Fuchsia, or the color the visible legend labels OT: OT (OT). If legend.otTime is printed, extend that shift's start/end to include the OT hours (e.g. K9 11:00-21:00 + OT 09:00-11:00 = 09:00-21:00). Keep the printed shift code.
   * Red: VACATION (VACATION)
   * Olive / Mustard / Yellow-green or text contains "BL": BUSINESS_LEAVE (BUSINESS LEAVE)
   * Slate Blue / Medium Blue or text contains "OT DAYOFF": OT_DAYOFF (OT DAYOFF)
@@ -44,6 +46,7 @@ Mandatory rules:
   - For each date column where NANCHAYA is working (not OFF): inspect all other employee rows in the table (e.g. MINTRA, SUNISA, JANTARAS). Extract every colleague who is also working on that same date (exclude colleagues whose code is OFF, leave, or absent) into the coworkers array ({ name: "EMPLOYEE_NAME", code: "SHIFT_CODE" }). Normalize employee names to clean uppercase.
   - If NANCHAYA is OFF on that date or no other colleagues are working, return an empty array [] for coworkers.
 - Read only REMARK entries that explicitly include NANCHAYA.
+- Use REMARK entries as the authority for anything unusual in NANCHAYA's row: if a remark explains a cell (e.g. "NANCHAYA : OT ON DAYOFF 30NOV26", leave, shift swap), use it to confirm that cell's status. A remark with no printed start/end time is never a specialEvent; do not invent times for it. If a remark conflicts with the cell or color, keep the visible cell and add a warning with code remark_conflict.
 - OFF means a day off. Use code OFF, isDayOff true, and null start/end.
 - Do not invent blurry, cropped, unreadable, or missing values. Record uncertainty in warnings.
 - Preserve each printed shift code after trimming whitespace and normalizing letter case.
@@ -65,6 +68,7 @@ export const ROSTER_RESPONSE_SCHEMA = {
     "year",
     "timezone",
     "printedOffCount",
+    "legend",
     "shifts",
     "specialEvents",
     "warnings",
@@ -75,6 +79,7 @@ export const ROSTER_RESPONSE_SCHEMA = {
     "year",
     "timezone",
     "printedOffCount",
+    "legend",
     "shifts",
     "specialEvents",
     "warnings",
@@ -89,6 +94,33 @@ export const ROSTER_RESPONSE_SCHEMA = {
       enum: ["Asia/Bangkok"],
     },
     printedOffCount: { type: Type.INTEGER, nullable: true },
+    legend: {
+      type: Type.OBJECT,
+      required: ["shiftTimes", "otTime"],
+      properties: {
+        shiftTimes: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            required: ["code", "start", "end"],
+            properties: {
+              code: { type: Type.STRING },
+              start: { type: Type.STRING },
+              end: { type: Type.STRING },
+            },
+          },
+        },
+        otTime: {
+          type: Type.OBJECT,
+          nullable: true,
+          required: ["start", "end"],
+          properties: {
+            start: { type: Type.STRING },
+            end: { type: Type.STRING },
+          },
+        },
+      },
+    },
     shifts: {
       type: Type.ARRAY,
       items: {

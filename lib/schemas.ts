@@ -49,6 +49,19 @@ export const rosterWarningSchema = z.object({
   date: z.string().regex(isoDate).nullable(),
 });
 
+const shiftTimeSchema = z.object({
+  start: z.string().regex(localTime),
+  end: z.string().regex(localTime),
+});
+
+export const rosterLegendSchema = z.object({
+  shiftTimes: z
+    .array(shiftTimeSchema.extend({ code: z.string().min(1).max(24) }))
+    .max(30)
+    .default([]),
+  otTime: shiftTimeSchema.nullable().default(null),
+});
+
 export const rosterAnalysisSchema = z.object({
   employee: z.literal("NANCHAYA"),
   inputMethod: z.enum(["image", "text"]).optional(),
@@ -56,6 +69,7 @@ export const rosterAnalysisSchema = z.object({
   year: z.number().int().min(2020).max(2100),
   timezone: z.literal("Asia/Bangkok"),
   printedOffCount: z.number().int().min(0).max(31).nullable().default(null),
+  legend: rosterLegendSchema.optional(),
   shifts: z.array(rosterShiftSchema).min(1).max(31),
   specialEvents: z.array(specialEventSchema).max(100),
   warnings: z.array(rosterWarningSchema).max(100),

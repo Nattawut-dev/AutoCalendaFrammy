@@ -7,6 +7,7 @@ import { validateRoster } from "@/lib/roster/validate";
 import { createRosterIcs } from "@/lib/calendar/create-ics";
 import { rosterAnalysisSchema } from "@/lib/schemas";
 import { SEPTEMBER_TEXT } from "./fixtures/september-text";
+import { NOVEMBER_TEXT } from "./fixtures/november-text";
 
 describe("text roster to calendar", () => {
   it("preserves September coworkers and creates overlapping remarks separately, including on OFF", () => {
@@ -36,6 +37,94 @@ describe("text roster to calendar", () => {
     expect(ics).toContain("SUNISA (F9)");
     expect(ics).toContain("🌷 TRAINING");
     expect(ics).not.toContain("SUMMARY:กะ OFF");
+  });
+
+  it("accepts November OT-extended K9, H9 and OT DAYOFF", () => {
+    const result = parseTextRoster(NOVEMBER_TEXT);
+    if (!result?.ok) throw new Error(JSON.stringify(result));
+    const roster = rosterAnalysisSchema.parse(result.roster);
+    expect(validateRoster(roster).confirmable).toBe(true);
+    const day = (n: number) => roster.shifts[n - 1];
+    expect(day(2)).toMatchObject({
+      code: "K9",
+      status: "OT",
+      start: "09:00",
+      end: "21:00",
+    });
+    expect(day(3)).toMatchObject({ code: "K9", start: "11:00", end: "21:00" });
+    expect(day(8)).toMatchObject({
+      code: "H9",
+      status: "SHIFT_CHANGE",
+      start: "08:00",
+      end: "18:00",
+    });
+    expect(day(30)).toMatchObject({ code: "F9", status: "OT_DAYOFF" });
+    const ics = createRosterIcs(roster).replace(/\r\n[ \t]/g, "");
+    expect(ics).toContain("DTSTART;TZID=Asia/Bangkok:20261102T090000");
+  });
+
+  it.each([
+    NOVEMBER_TEXT.replace("🧡 K9 · 💜 OT — 09:00", "🧡 K9 — 09:00"),
+    NOVEMBER_TEXT.replace(
+      "🧡 K9 · 💜 OT — 09:00–21:00",
+      "🧡 K9 · 💜 OT — 12:00–21:00",
+    ),
+  ])("rejects non-standard time unless OT covers the shift", (text) => {
+    expect(parseTextRoster(text)).toMatchObject({ ok: false });
+  });
+
+  it("uses shift and OT times printed in the message legend over built-in times", () => {
+    const legendText = NOVEMBER_TEXT.replace(
+      "ตาราง 2026-11 OFF=9",
+      "ตาราง 2026-11 OFF=9\nDETIALS:\nF9 : 06.00-16.00\nK9 : 11.00-21.00\nH9 : 08.00-18.00\nOT 09.00-11.00",
+    );
+    const result = parseTextRoster(legendText);
+    if (!result?.ok) throw new Error(JSON.stringify(result));
+    expect(result.roster.legend?.otTime).toEqual({
+      start: "09:00",
+      end: "11:00",
+    });
+    expect(
+      validateRoster(rosterAnalysisSchema.parse(result.roster)).confirmable,
+    ).toBe(true);
+
+    // A new code exists only because the roster defines it.
+    const newCode = parseTextRoster(
+      legendText
+        .replace("H9 : 08.00-18.00", "X7 : 07.00-14.00")
+        .replace("H9 · 🎀 SHIFT CHANGE — 08:00–18:00", "X7 — 07:00–14:00"),
+    );
+    expect(newCode?.ok && newCode.roster.shifts[7]).toMatchObject({
+      code: "X7",
+      start: "07:00",
+      end: "14:00",
+    });
+
+    // The legend wins over built-in K9 times.
+    const moved = parseTextRoster(
+      legendText.replace("K9 : 11.00-21.00", "K9 : 12.00-21.00"),
+    );
+    expect(moved).toMatchObject({ ok: false });
+
+    // With printed OT hours the OT day must match them exactly.
+    expect(
+      parseTextRoster(legendText.replace("OT 09.00-11.00", "OT 10.00-11.00")),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("compact codes use legend times for unknown codes", () => {
+    const result = parseTextRoster(
+      MANUAL_ROSTER_EXAMPLE.replace("L8 H8 H8", "X7 H8 H8") +
+        "\nX7 07:00-14:00",
+    );
+    expect(result?.ok && result.roster.shifts[0]).toMatchObject({
+      code: "X7",
+      start: "07:00",
+      end: "14:00",
+    });
+    expect(
+      parseTextRoster(MANUAL_ROSTER_EXAMPLE.replace("L8 H8 H8", "X7 H8 H8")),
+    ).toMatchObject({ ok: false });
   });
 
   it("accepts explicit status and remarks with shorthand input", () => {

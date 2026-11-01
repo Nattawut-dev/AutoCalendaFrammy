@@ -1,5 +1,5 @@
+import { isAllowedShiftTime } from "@/lib/roster/legend";
 import {
-  KNOWN_SHIFT_TIMES,
   MIN_SHIFT_CONFIDENCE,
   MIN_SPECIAL_EVENT_CONFIDENCE,
 } from "@/lib/constants";
@@ -118,16 +118,20 @@ export function validateRoster(roster: RosterAnalysis): RosterValidationResult {
           date: shift.date,
         });
       }
-      const known = KNOWN_SHIFT_TIMES[shift.code];
       if (
-        known &&
         shift.start &&
         shift.end &&
-        (known.start !== shift.start || known.end !== shift.end)
+        !isAllowedShiftTime(
+          shift.code,
+          shift.status,
+          shift.start,
+          shift.end,
+          roster.legend,
+        )
       ) {
         issues.push({
           code: "known_code_mismatch",
-          message: `${shift.code} มีเวลาไม่ตรงกับรายการอ้างอิง โปรดตรวจสอบด้วยตนเอง`,
+          message: `${shift.code} มีเวลาไม่ตรงกับคำอธิบายกะในตาราง โปรดตรวจสอบด้วยตนเอง`,
           date: shift.date,
         });
       }
@@ -185,7 +189,10 @@ export function validateRoster(roster: RosterAnalysis): RosterValidationResult {
   }
 
   for (const warning of roster.warnings) {
-    if (warning.code.startsWith("independent_")) {
+    if (
+      warning.code.startsWith("independent_") ||
+      warning.code === "remark_conflict"
+    ) {
       issues.push({
         code: warning.code,
         message: warning.message,

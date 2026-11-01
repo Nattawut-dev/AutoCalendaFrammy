@@ -7,6 +7,7 @@ export const MIN_SHIFT_CONFIDENCE = 0.88;
 export const MIN_STATUS_CONFIDENCE = 0.8;
 export const MIN_SPECIAL_EVENT_CONFIDENCE = 0.85;
 
+/** Fallback only: a legend in the roster or message always wins. */
 export const KNOWN_SHIFT_TIMES: Readonly<
   Record<string, { start: string; end: string }>
 > = {
@@ -14,6 +15,7 @@ export const KNOWN_SHIFT_TIMES: Readonly<
   HH9: { start: "08:30", end: "18:30" },
   JJ9: { start: "10:30", end: "20:30" },
   H8: { start: "08:00", end: "17:00" },
+  H9: { start: "08:00", end: "18:00" },
   K9: { start: "11:00", end: "21:00" },
   M7: { start: "13:00", end: "21:00" },
   L8: { start: "12:00", end: "21:00" },

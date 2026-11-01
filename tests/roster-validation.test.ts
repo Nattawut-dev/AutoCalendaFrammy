@@ -15,6 +15,21 @@ describe("roster validation", () => {
     });
   });
 
+  it("validates times against the legend read from the image", () => {
+    const roster = cloneSampleRoster();
+    const code = roster.shifts.find((s) => !s.isDayOff)!.code;
+    const sameCode = roster.shifts.filter((s) => s.code === code);
+    for (const s of sameCode) s.start = "05:00";
+    expect(validateRoster(roster).issues.map((i) => i.code)).toContain(
+      "known_code_mismatch",
+    );
+    roster.legend = {
+      shiftTimes: [{ code, start: "05:00", end: sameCode[0].end! }],
+      otTime: null,
+    };
+    expect(validateRoster(roster).confirmable).toBe(true);
+  });
+
   it("rejects a missing day", () => {
     const roster = cloneSampleRoster();
     roster.shifts.splice(16, 1);

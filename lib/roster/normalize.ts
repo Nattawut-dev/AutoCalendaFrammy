@@ -1,5 +1,6 @@
 import { rosterAnalysisSchema } from "@/lib/schemas";
-import { KNOWN_SHIFT_TIMES, MIN_STATUS_CONFIDENCE } from "@/lib/constants";
+import { MIN_STATUS_CONFIDENCE } from "@/lib/constants";
+import { resolveShiftTime } from "@/lib/roster/legend";
 import type { RosterAnalysis } from "@/lib/types";
 import { cleanText } from "@/lib/utils/text";
 
@@ -7,12 +8,19 @@ const OFF_PATTERN = /^(OFF|DAY\s*OFF|O[F8][F8])$/i;
 
 export function normalizeRoster(input: unknown): RosterAnalysis {
   const parsed = rosterAnalysisSchema.parse(input);
+  const legend = parsed.legend && {
+    ...parsed.legend,
+    shiftTimes: parsed.legend.shiftTimes.map((s) => ({
+      ...s,
+      code: cleanText(s.code).toUpperCase(),
+    })),
+  };
 
   const shifts = parsed.shifts
     .map((shift) => {
       const rawCode = cleanText(shift.code).toUpperCase();
       const isOff = shift.isDayOff || OFF_PATTERN.test(rawCode);
-      const knownTime = KNOWN_SHIFT_TIMES[rawCode];
+      const knownTime = resolveShiftTime(rawCode, legend);
       const start = isOff ? null : shift.start || knownTime?.start || null;
       const end = isOff ? null : shift.end || knownTime?.end || null;
       const coworkers = isOff
@@ -70,6 +78,7 @@ export function normalizeRoster(input: unknown): RosterAnalysis {
 
   return {
     ...parsed,
+    ...(legend ? { legend } : {}),
     shifts,
     specialEvents,
     warnings,

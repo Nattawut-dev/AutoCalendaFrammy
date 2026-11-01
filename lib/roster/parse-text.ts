@@ -1,8 +1,11 @@
 import { KNOWN_SHIFT_TIMES } from "@/lib/constants";
+import { resolveShiftTime } from "@/lib/roster/legend";
 import type { RosterAnalysis } from "@/lib/types";
 import { daysInMonth, weekdayForIsoDate } from "@/lib/utils/date";
 import {
+  isLegendLine,
   parseDailyDetails,
+  parseTextLegend,
   parseTextRemarks,
 } from "@/lib/roster/parse-text-details";
 
@@ -46,15 +49,20 @@ export function parseTextRoster(text: string): TextRosterResult | null {
     .map((line) => line.trim())
     .filter(Boolean);
   const remarkLines = lines.filter((line) => /^REMARK\b/i.test(line));
-  const shiftLines = lines.filter(
-    (line) => !/^REMARK\b/i.test(line) && line !== "รายละเอียดทุกวัน",
+  const otherLines = lines.filter((line) => !/^REMARK\b/i.test(line));
+  const shiftLines = otherLines.filter(
+    (line) =>
+      !isLegendLine(line) &&
+      !/^(?:รายละเอียดทุกวัน|DETAILS?:?|DETIALS:?)$/i.test(line),
   );
   let details: ReturnType<typeof parseDailyDetails> | undefined;
   let specialEvents: RosterAnalysis["specialEvents"];
+  let legend: RosterAnalysis["legend"];
   try {
+    legend = parseTextLegend(otherLines);
     specialEvents = parseTextRemarks(remarkLines, dateForDay, totalDays);
     if (shiftLines.some((line) => /^\d/.test(line))) {
-      details = parseDailyDetails(shiftLines, month, totalDays);
+      details = parseDailyDetails(shiftLines, month, totalDays, legend);
     }
   } catch (error) {
     return fail(
@@ -75,11 +83,11 @@ export function parseTextRoster(text: string): TextRosterResult | null {
     );
   }
   const unknown = codes.findIndex(
-    (code) => code !== "OFF" && !Object.hasOwn(KNOWN_SHIFT_TIMES, code),
+    (code) => code !== "OFF" && !resolveShiftTime(code, legend),
   );
   if (unknown !== -1) {
     return fail(
-      `ไม่รู้จักรหัสวันที่ ${unknown + 1}: ${codes[unknown].slice(0, 24)}\nรองรับ ${Object.keys(KNOWN_SHIFT_TIMES).join(", ")} และ OFF`,
+      `ไม่รู้จักรหัสวันที่ ${unknown + 1}: ${codes[unknown].slice(0, 24)}\nรองรับ ${Object.keys(KNOWN_SHIFT_TIMES).join(", ")} และ OFF หรือเพิ่มบรรทัดเวลากะตามตาราง เช่น H9 08:00-18:00`,
     );
   }
   const actualOff = codes.filter((code) => code === "OFF").length;
@@ -97,16 +105,18 @@ export function parseTextRoster(text: string): TextRosterResult | null {
       year,
       timezone: "Asia/Bangkok",
       printedOffCount: offCount,
+      ...(legend ? { legend } : {}),
       shifts: codes.map((code, index) => {
         const date = dateForDay(index + 1);
         const detail = details?.get(index + 1);
-        const time = code === "OFF" ? undefined : KNOWN_SHIFT_TIMES[code];
+        const time =
+          code === "OFF" ? undefined : resolveShiftTime(code, legend);
         return {
           date,
           printedWeekday: weekdayForIsoDate(date),
           code,
-          start: time?.start ?? null,
-          end: time?.end ?? null,
+          start: detail?.start ?? time?.start ?? null,
+          end: detail?.end ?? time?.end ?? null,
           isDayOff: code === "OFF",
           source: "roster",
           confidence: 1,

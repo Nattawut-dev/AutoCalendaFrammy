@@ -49,6 +49,14 @@ export type RosterWarning = {
   date: string | null;
 };
 
+export type ShiftTime = { start: string; end: string };
+
+/** Definitions printed on the roster (DETAILS/legend), e.g. "H9 : 08.00-18.00", "OT 09.00-11.00". */
+export type RosterLegend = {
+  shiftTimes: ({ code: string } & ShiftTime)[];
+  otTime: ShiftTime | null;
+};
+
 export type RosterAnalysis = {
   employee: "NANCHAYA";
   inputMethod?: "image" | "text";
@@ -56,6 +64,7 @@ export type RosterAnalysis = {
   year: number;
   timezone: "Asia/Bangkok";
   printedOffCount: number | null;
+  legend?: RosterLegend;
   shifts: RosterShift[];
   specialEvents: SpecialEvent[];
   warnings: RosterWarning[];

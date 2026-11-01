@@ -1,6 +1,16 @@
-import { KNOWN_SHIFT_TIMES } from "@/lib/constants";
+import {
+  expectedShiftTime,
+  isAllowedShiftTime,
+  parseLegendLine,
+  resolveShiftTime,
+} from "@/lib/roster/legend";
 import { ROSTER_STATUSES, STATUS_PRESENTATION } from "@/lib/roster/status";
-import type { RosterCoworker, RosterStatus, SpecialEvent } from "@/lib/types";
+import type {
+  RosterCoworker,
+  RosterLegend,
+  RosterStatus,
+  SpecialEvent,
+} from "@/lib/types";
 import { formatThaiMonth, isValidTime } from "@/lib/utils/date";
 
 type DayDetail = {
@@ -14,11 +24,36 @@ type DayDetail = {
 const stripEmoji = (value: string) =>
   value.replace(/^[\s\p{Extended_Pictographic}\uFE0F\u200D]+/u, "").trim();
 
+/** Definition lines from the roster legend; they override built-in times. */
+export function parseTextLegend(lines: string[]): RosterLegend | undefined {
+  const legend: RosterLegend = { shiftTimes: [], otTime: null };
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const entry = parseLegendLine(line);
+    if (!entry) continue;
+    if (
+      !isValidTime(entry.start) ||
+      !isValidTime(entry.end) ||
+      entry.start === entry.end
+    )
+      throw new Error(`เวลาในคำอธิบายกะ ${entry.code} ไม่ถูกต้อง`);
+    if (seen.has(entry.code)) throw new Error(`คำอธิบายกะ ${entry.code} ซ้ำ`);
+    seen.add(entry.code);
+    if (entry.code === "OT")
+      legend.otTime = { start: entry.start, end: entry.end };
+    else legend.shiftTimes.push(entry);
+  }
+  return seen.size ? legend : undefined;
+}
+
+export const isLegendLine = (line: string) => parseLegendLine(line) !== null;
+
 /** Parse explicit dates, never infer missing dates from line positions. */
 export function parseDailyDetails(
   lines: string[],
   month: number,
   totalDays: number,
+  legend?: RosterLegend,
 ): Map<number, DayDetail> {
   const days = new Map<number, DayDetail>();
   for (const line of lines) {
@@ -45,7 +80,7 @@ export function parseDailyDetails(
           !name ||
           name === "NANCHAYA" ||
           coworkers.some((p) => p.name === name) ||
-          !Object.hasOwn(KNOWN_SHIFT_TIMES, code)
+          !resolveShiftTime(code, legend)
         )
           throw new Error(
             `ชื่อหรือรหัสเพื่อนร่วมงานวันที่ ${day} ไม่ถูกต้องหรือซ้ำ`,
@@ -74,17 +109,18 @@ export function parseDailyDetails(
       continue;
     }
     const times = /^(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})$/.exec(parts[1] ?? "");
-    if (
-      !Object.hasOwn(KNOWN_SHIFT_TIMES, code) ||
-      !times ||
-      !isValidTime(times[1]) ||
-      !isValidTime(times[2])
-    )
-      throw new Error(`รหัสหรือเวลากะวันที่ ${day} ไม่ถูกต้อง`);
-    const known = KNOWN_SHIFT_TIMES[code];
-    if (times[1] !== known.start || times[2] !== known.end)
+    if (!resolveShiftTime(code, legend))
       throw new Error(
-        `เวลากะ ${code} วันที่ ${day} ไม่ตรงกับเวลามาตรฐาน ${known.start}–${known.end}`,
+        `ไม่รู้จักกะ ${code} วันที่ ${day} ถ้าเป็นกะใหม่ให้เพิ่มบรรทัดตามตาราง เช่น ${code} 08:00-18:00`,
+      );
+    if (!times || !isValidTime(times[1]) || !isValidTime(times[2]))
+      throw new Error(`รหัสหรือเวลากะวันที่ ${day} ไม่ถูกต้อง`);
+    const expected = expectedShiftTime(code, status, legend)!;
+    if (!isAllowedShiftTime(code, status, times[1], times[2], legend))
+      throw new Error(
+        status === "OT" || status === "OT_DAYOFF"
+          ? `เวลากะ ${code} + OT วันที่ ${day} ไม่ตรงกับตาราง (${expected.start}–${expected.end})`
+          : `เวลากะ ${code} วันที่ ${day} ไม่ตรงกับตาราง ${expected.start}–${expected.end} (ถ้าเป็น OT ให้ใส่ · OT)`,
       );
     days.set(day, { code, start: times[1], end: times[2], coworkers, status });
   }
